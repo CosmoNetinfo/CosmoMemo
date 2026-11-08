@@ -1,0 +1,10 @@
+import {cookies} from 'next/headers';
+import {redirect} from 'next/navigation';
+import {authorization} from '@/lib/cloud/oauth';
+import {authenticated,COOKIE,hash,seal} from '@/lib/cloud/security';
+export const dynamic='force-dynamic';
+export default async function Consent({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}){
+ const raw=await searchParams;const params=new URLSearchParams();for(const [key,value]of Object.entries(raw))if(typeof value==='string')params.set(key,value);
+ if(!await authenticated())redirect('/login?next='+encodeURIComponent('/oauth/authorize?'+params.toString()));
+ try{const auth=await authorization(params);const session=(await cookies()).get(COOKIE)!.value;const ticket=seal({purpose:'consent',auth,session:hash(session),exp:Date.now()+600000});return <main className="auth-shell"><section className="auth-card"><span className="auth-symbol">✳</span><span className="eyebrow">COLLEGA IL TUO ASSISTENTE</span><h1>Autorizza {auth.client_name}</h1><p>Il connettore potrà accedere al tuo spazio personale con questi permessi:</p><ul className="permission-list">{auth.scope.split(' ').map(s=><li key={s}>{({'pages:read':'Leggere pagine e attività','pages:write':'Creare e modificare pagine e attività','memory:read':'Cercare e leggere ricordi','memory:write':'Salvare, aggiornare ed eliminare ricordi'} as Record<string,string>)[s]}</li>)}</ul><p className="muted">Ritorno a <strong>{new URL(auth.redirect_uri).origin}</strong>. Potrai revocare l’accesso dalle impostazioni di CosmoMemo.</p><form method="post" action="/oauth/consent"><input type="hidden" name="ticket" value={ticket}/><div className="auth-buttons"><button className="outline-button" name="decision" value="deny">Annulla</button><button className="dark-button" name="decision" value="allow">Autorizza il collegamento</button></div></form></section></main>;}catch{return <main className="auth-shell"><section className="auth-card"><h1>Collegamento non valido</h1><p>Avvia di nuovo il collegamento dalle impostazioni di Claude.</p><a href="/">Torna a CosmoMemo</a></section></main>;}
+}

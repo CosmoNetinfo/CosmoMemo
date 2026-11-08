@@ -1,0 +1,3 @@
+import {exchange,OAuthError} from '@/lib/cloud/oauth';
+import {noStore} from '@/lib/cloud/security';
+export async function POST(request:Request){try{if(Number(request.headers.get('content-length')||0)>8192)return noStore({error:'invalid_request'},413);const text=await request.text();if(text.length>8192)return noStore({error:'invalid_request'},413);return noStore(await exchange(new URLSearchParams(text)));}catch(e){return noStore({error:e instanceof OAuthError?e.code:'server_error',error_description:e instanceof OAuthError?e.message:'Servizio temporaneamente non disponibile.'},e instanceof OAuthError?e.status:503);}}

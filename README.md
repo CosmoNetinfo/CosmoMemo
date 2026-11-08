@@ -1,19 +1,71 @@
 # CosmoMemo · Spazio
 
-Uno spazio personale in italiano per scrivere, organizzare idee e seguire progetti. Ispirato al modello di pagine e blocchi di Notion, con un’interfaccia e un nome indipendenti.
+Pagine, progetti e **memoria persistente per Claude**, con Next.js e PostgreSQL Neon. Un’app personale indipendente, ispirata al modello a blocchi di Notion.
 
-![Anteprima della home di Spazio](docs/anteprima.png)
+![Anteprima della home](docs/anteprima.png)
 
-Questa versione usa **Next.js standard** ed è pronta per essere importata su **Vercel**. Non richiede Cloudflare, Sites, credenziali ChatGPT, un database o chiavi API.
+## Cosa comprende
 
-## Funzioni
+- Pagine e sottopagine, editor a blocchi, preferiti, ricerca, modelli e cestino.
+- Attività in tabella e bacheca, filtri, priorità e scadenze.
+- Modalità locale nel browser e spazio cloud personale protetto da password.
+- Salvataggio in Neon e controllo delle revisioni per evitare sovrascritture tra app e Claude.
+- Memoria esterna con chiavi, contenuti, tag e revisioni, modificabile ed eliminabile dall’app.
+- Server MCP remoto con autorizzazione OAuth, consenso, PKCE S256, rinnovo e revoca dei token.
+- Backup JSON delle pagine, esportazione Markdown ed esportazione separata dei ricordi.
 
-- Pagine e sottopagine, icone, preferiti e ricerca nel testo.
-- Editor con dieci tipi di blocco, menu `/`, riordino e duplicazione.
-- Attività in tabella e bacheca, stato, priorità, scadenza, filtri e ordinamento.
-- Modelli, cestino e ripristino, tema chiaro/scuro e layout responsivo.
-- Salvataggio automatico nel browser, backup JSON e importazione senza sovrascrivere i dati presenti.
-- Esportazione Markdown e importazione semplice di singoli file `.md`.
+Questa versione offre **un solo account proprietario per installazione**. Non è un servizio multiutente. I visitatori senza accesso possono usare solo le pagine locali nel proprio browser; non possono leggere il tuo archivio cloud.
+
+## Collegare Claude web/app
+
+1. Apri il tuo sito, ad esempio https://cosmo-memo.vercel.app/login.
+2. Alla prima attivazione inserisci il codice privato predisposto dal gestore e scegli una password di almeno 12 caratteri.
+3. In Claude apri **Impostazioni → Connettori → Aggiungi connettore personalizzato**.
+4. Nome: **CosmoMemo**. URL remoto: `https://cosmo-memo.vercel.app/mcp` (sostituisci il dominio se usi un’altra installazione).
+5. Avvia il collegamento, accedi a CosmoMemo e autorizza i permessi richiesti. Non servono client ID, client secret o chiavi API Anthropic: il client viene registrato tramite DCR.
+6. Abilita il connettore nella conversazione in cui vuoi usarlo.
+
+Se apri `/mcp` direttamente nel browser, una risposta **401** con richiesta di autorizzazione è normale. L’endpoint è riservato ai client MCP autenticati.
+
+Il supporto dei connettori dipende dal piano e dalle impostazioni del tuo account Claude. [Documentazione ufficiale sui connettori](https://support.anthropic.com/en/articles/11503834-building-custom-connectors-via-remote-mcp-servers).
+
+### Come usare la memoria
+
+Puoi chiedere, ad esempio:
+
+> Consulta la memoria CosmoMemo prima di rispondere e recupera il contesto del mio progetto.
+>
+> Ricorda in CosmoMemo che preferisco spiegazioni concise in italiano.
+>
+> Crea una pagina con le decisioni di oggi e salva un riepilogo nella memoria.
+
+La memoria **resta nel database tra conversazioni e riavvii** fino a quando la elimini. Non modifica la memoria interna di Claude e non carica automaticamente tutte le chat. Claude deve richiamare gli strumenti del connettore nelle nuove conversazioni: le istruzioni del server e il prompt `riprendi_contesto` favoriscono questo flusso, senza garantirne l’esecuzione automatica da parte del modello.
+
+Controlla i ricordi da **Memoria di Claude**. Puoi correggerli, eliminarli o esportarli. Non usarli per password e token. La cancellazione dall’app elimina la voce dal database attivo; eventuali copie nei backup del provider seguono la sua conservazione.
+
+### Strumenti MCP
+
+| Strumento | Funzione |
+| --- | --- |
+| `list_pages` | Cerca ed elenca le pagine |
+| `read_page` | Legge contenuto e revisione |
+| `create_page` | Crea una pagina con blocchi |
+| `update_page` | Modifica o aggiunge blocchi con controllo della revisione |
+| `list_tasks` | Legge le attività |
+| `save_task` | Crea o aggiorna un’attività |
+| `search_memories` | Recupera i ricordi pertinenti |
+| `remember` | Crea o aggiorna un ricordo |
+| `forget` | Elimina un ricordo |
+
+I permessi OAuth distinguono lettura e scrittura di pagine e memoria. Gli strumenti non autorizzati non vengono esposti. Dalle impostazioni di CosmoMemo puoi revocare un collegamento; i relativi token vengono invalidati anche se Claude li conserva.
+
+## Neon e costi
+
+Il database è PostgreSQL ospitato da Neon. La logica MCP non chiama API AI a consumo. Alla verifica dell’8 novembre 2026 Neon Free comprende **1 GB di database per progetto**, 100 CU-ore e 5 GB di traffico in uscita al mese per progetto. Per testo e metadati è un punto di partenza; capacità e durata effettive dipendono dai dati e dall’utilizzo.
+
+[Prezzi Neon](https://neon.com/pricing) · [Limiti del piano Free](https://neon.com/faqs/free-plan-limits-and-quotas) · [Registrazione Neon](https://console.neon.tech/signup)
+
+I limiti dei piani gratuiti possono sospendere le operazioni: non sono una promessa di servizio illimitato o di conservazione eterna. Conserva backup delle pagine e dei ricordi. L’hosting Vercel e l’account Claude hanno condizioni separate.
 
 ## Avvio locale
 
@@ -24,45 +76,79 @@ npm ci
 npm run dev
 ```
 
-Apri http://localhost:5173.
+Apri http://localhost:5173. Senza variabili d’ambiente, l’app funziona in modalità locale e l’integrazione cloud rimane disattivata.
 
 ```bash
+npm test
 npm run build
 npm run typecheck
 npm start
 ```
 
-## Pubblicazione su Vercel da GitHub
+I test automatici usano PostgreSQL embedded con PGlite e l’SDK MCP. Non richiedono un account Neon e non accedono al database di produzione.
 
-1. Su Vercel scegli **Add New → Project** e importa questa repository.
-2. Seleziona **Next.js** come framework e lascia la directory principale su `.`.
-3. Usa i comandi predefiniti: installazione `npm ci`, build `npm run build`. Lascia automatica la directory di output.
-4. Non servono variabili d’ambiente. Avvia **Deploy**.
+## Configurazione cloud su Vercel
 
-I successivi push sul branch di produzione attivano il rilascio tramite l’integrazione Git di Vercel. L’accessibilità del sito dipende dalle impostazioni di protezione del progetto Vercel: il codice non introduce un login applicativo. Ogni visitatore usa i propri dati locali.
+1. Importa la repository in Vercel con preset **Next.js** e directory principale `.`.
+2. Collega un database **Neon Free** da Storage/Marketplace. Non scegliere un piano a pagamento se vuoi mantenere il piano gratuito.
+3. Imposta le variabili server elencate in `.env.example`.
+4. Per applicare lo schema, scarica le variabili nel file locale ignorato `.env.local` ed esegui:
 
-Vedi anche la [guida ufficiale Vercel](https://vercel.com/docs/deployments).
+```bash
+npm run db:migrate
+```
 
-## Trasferire i contenuti dalla versione Sites
+5. Pubblica nuovamente dopo aver configurato le variabili.
+6. Apri `/login`, inserisci il codice di attivazione e scegli la password proprietario.
 
-1. Nel vecchio sito apri **Impostazioni → Backup completo → Esporta**.
-2. Nel nuovo indirizzo Vercel apri **Impostazioni → Importa contenuti** e seleziona il file JSON.
+| Variabile | Scopo |
+| --- | --- |
+| `DATABASE_URL` | Connessione PostgreSQL Neon, generata dall’integrazione Vercel. È accettata anche `POSTGRES_URL`. |
+| `COSMOMEMO_APP_URL` | Origine HTTPS stabile dell’app, per esempio `https://cosmo-memo.vercel.app`. In locale: `http://localhost:5173`. |
+| `COSMOMEMO_SESSION_SECRET` | Segreto casuale di almeno 32 caratteri per firmare sessioni e consenso. |
+| `COSMOMEMO_SETUP_TOKEN` | Codice casuale diverso dal precedente, da consegnare privatamente al proprietario per la prima attivazione. |
 
-Il trasferimento non è automatico: il salvataggio del browser appartiene all’indirizzo del sito. Conserva il file JSON come copia di sicurezza. L’importazione aggiunge copie dei contenuti; ripeterla produce duplicati.
+**Non usare il prefisso `NEXT_PUBLIC_` per questi valori.** Non inserire credenziali nella repository, negli URL MCP o nella chat. `.env.local` è escluso da Git e dagli upload Vercel.
 
-## Dati e limiti
+Lo script `scripts/configure-cloud.mjs` automatizza la configurazione nel progetto Vercel già collegato; richiede il percorso del CLI Vercel, un account autenticato e un URL HTTPS. Genera le chiavi senza stamparle e salva le istruzioni di attivazione nella cartella superiore al repository. Conserva i valori locali se lo riesegui: non rigenerare il segreto di sessione di un’app già in uso senza pianificare la disconnessione delle sessioni esistenti.
 
-Pagine e attività restano nel localStorage del browser corrente e non vengono inviate a un server applicativo. Cancellare i dati del sito elimina il workspace. Non sono previste sincronizzazione tra dispositivi, collaborazione, allegati, AI, relazioni, formule, database personalizzabili o riapertura offline garantita. I font Google sono scaricati esternamente con fallback di sistema.
+I deployment di anteprima non ricevono automaticamente accesso al database personale. Per provarli, usa ambiente e database isolati; non assegnare le credenziali di produzione a ogni preview.
 
-Non ci sono abbonamenti applicativi o API a pagamento per le funzioni implementate. Hosting, quote e condizioni dipendono dal piano Vercel scelto.
+## Trasferire i dati locali
 
-## Struttura e documentazione
+Dopo l’accesso al cloud apri **Impostazioni → Pagine di questo browser → Importa nel cloud**. I dati del browser vengono conservati e copiati nel database. Ripetere l’importazione produce duplicati.
 
-- `app/page.tsx`: interfaccia, editor e gestione del workspace.
-- `app/globals.css`: stile e layout responsivo.
-- `lib/workspace.ts`: schema, validazione, contenuti iniziali ed esportazione.
-- [RICERCA.md](RICERCA.md): ricerca originale e confronto delle funzionalità.
-- [VERIFICHE.md](VERIFICHE.md): controlli sulla prima versione.
-- GitHub Actions controlla build e TypeScript a ogni push e pull request.
+Per trasferire le pagine dal vecchio indirizzo Sites, esporta prima il backup JSON dal vecchio sito, poi importalo nel nuovo sito dopo l’accesso al cloud. L’importazione non include automaticamente i ricordi, esportabili separatamente dalla sezione Memoria di Claude.
 
-Il progetto non è affiliato a Notion. Le dipendenze mantengono le rispettive licenze. La ricerca descrive anche la prima versione Vinext/Sites; questa distribuzione usa Next.js e non include gli strumenti di hosting di quel template.
+### Modifiche contemporanee e interruzioni
+
+Quando torni nella scheda, l’app recupera gli aggiornamenti cloud se non ci sono modifiche locali in attesa. È disponibile anche il pulsante **Sincronizza**. Non c’è polling continuo, per evitare di mantenere attivo il database gratuito inutilmente.
+
+In caso di conflitto, il salvataggio si ferma e conserva la bozza nel browser. **Esporta bozza e ricarica** scarica una copia della bozza prima di recuperare la versione cloud; puoi poi importarla e unire i contenuti. Non è un sistema di editing collaborativo simultaneo.
+
+## Sicurezza e gestione
+
+- Password proprietario salvata con scrypt e sale casuale; cookie di sessione HttpOnly, SameSite e Secure in produzione.
+- Controllo dell’origine sulle modifiche eseguite dal browser e limite ai tentativi di accesso.
+- Token MCP memorizzati come hash, associati alla risorsa e ai permessi; accesso di un’ora e rinnovo fino a 30 giorni, con rotazione e rilevamento dei riutilizzi.
+- Codici OAuth monouso di cinque minuti; redirect ammessi solo per i callback Claude dichiarati e localhost `/callback` per client compatibili.
+- Lo schema non espone un’API SQL pubblica e revoca i privilegi `PUBLIC` sulle tabelle applicative.
+
+L’operatore può ripristinare la password con `npm run owner:reset` dal proprio ambiente server configurato. Il comando invalida le sessioni e tutti i collegamenti Claude. Il codice di prima attivazione non è un meccanismo di recupero per un account già attivato.
+
+Non è stato eseguito un audit indipendente di sicurezza. La prima versione resta limitata a uso personale: niente allegati, formule, relazioni, database personalizzabili o sincronizzazione collaborativa in tempo reale.
+
+## Struttura
+
+- `app/page.tsx`, `app/globals.css`: editor e workspace.
+- `app/login`, `app/oauth`, `app/mcp`: accesso personale, autorizzazione e connettore remoto.
+- `app/api`: API protette per pagine, ricordi e collegamenti.
+- `hooks/use-cloud-workspace.ts`: bozza locale, salvataggio con revisioni e recupero cloud.
+- `components/cloud-panel.tsx`: memoria e gestione dei collegamenti.
+- `lib/cloud`: database, sicurezza, OAuth e strumenti MCP.
+- `db/schema.sql`: schema PostgreSQL idempotente.
+- `tests/cloud.test.ts`: test di persistenza, conflitti, OAuth e protocollo MCP.
+- [RICERCA.md](RICERCA.md): ricerca originale, riferita alla prima versione.
+- [VERIFICHE.md](VERIFICHE.md): controlli e limiti di verifica.
+
+GitHub Actions esegue test, build e TypeScript a ogni push e pull request. Il progetto non è affiliato a Notion o Anthropic. Le dipendenze mantengono le rispettive licenze.

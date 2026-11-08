@@ -1,5 +1,24 @@
 # Verifiche — 8 novembre 2026
 
+## Versione 2 — memoria Neon e Claude MCP
+
+- Test con PostgreSQL embedded PGlite: persistenza, aggiornamenti con revisioni, conflitti e cancellazione dei ricordi.
+- Test dell’SDK MCP con connessioni distinte: pagine e ricordi creati da un client risultano leggibili da quello successivo.
+- Test Streamable HTTP stateless: inizializzazione e chiamate su istanze server separate.
+- OAuth: controllo dei redirect, PKCE, codici monouso, verifica della risorsa, scadenze, rotazione dei refresh token, revoca e rilevamento del riutilizzo.
+- Sessioni firmate, verifica password scrypt e limite ai tentativi di accesso.
+- Browser Chromium contro Next.js e il nuovo database Neon: login, contenuti cloud visibili da un secondo contesto browser, consenso OAuth e scambio PKCE, scrittura di pagina e ricordo tramite MCP, aggiornamento della memoria dall’app, conflitto conservato come bozza esportabile, eliminazione e revoca effettiva del token.
+- I dati di questa verifica erano temporanei e sono stati rimossi. Il proprietario dell’installazione deve ancora scegliere la propria password tramite prima attivazione.
+- Il ritorno OAuth a Claude è stato intercettato dal test: non è stato collegato un account Claude reale. Il collegamento dal connettore dell’utente richiede la sua autenticazione e resta da verificare su quel client.
+- La memoria è esterna al modello: nessuna verifica può garantire che Claude richiami automaticamente il connettore in ogni nuova chat.
+- L’archivio usa un singolo account proprietario; non è stata implementata una piattaforma multiutente.
+- Ripetuti con successo anche i flussi originali in modalità locale, con il cloud disattivato nel browser di prova.
+- Build Next.js e TypeScript riusciti. Audit delle dipendenze di produzione: nessuna vulnerabilità segnalata al controllo.
+- Il controllo sui file statici del bundle non ha trovato le credenziali server configurate. `.env.local` e il codice di attivazione non vengono caricati nella repository.
+- Ripetuto l’intero flusso sulla build di produzione locale, inclusa la prima attivazione tramite codice e scelta della password. L’account temporaneo è stato rimosso al termine.
+
+Le sezioni successive descrivono anche le verifiche della prima versione.
+
 ## Distribuzione GitHub / Vercel
 
 - Conversione in Next.js standard 16.4.5, senza dipendenze dal runtime Sites/Cloudflare.

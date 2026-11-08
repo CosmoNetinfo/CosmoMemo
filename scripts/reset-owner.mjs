@@ -1,0 +1,13 @@
+import nextEnv from '@next/env';
+import {neon} from '@neondatabase/serverless';
+import {randomBytes,scryptSync} from 'node:crypto';
+nextEnv.loadEnvConfig(process.cwd());
+if(!process.stdin.isTTY)throw Error('Esegui il comando in un terminale interattivo. La password non viene mostrata.');
+if(!process.env.DATABASE_URL&&!process.env.POSTGRES_URL)throw Error('DATABASE_URL non configurato.');
+process.stdout.write('Nuova password proprietario (almeno 12 caratteri, input nascosto): ');
+const password=await new Promise((resolve,reject)=>{let value='';process.stdin.setRawMode(true);process.stdin.setEncoding('utf8');process.stdin.resume();const finish=()=>{process.stdin.setRawMode(false);process.stdin.pause();process.stdin.removeListener('data',onData);process.stdout.write('\n');};function onData(data){for(const char of data){if(char==='\u0003'){finish();reject(Error('Annullato.'));return;}if(char==='\r'||char==='\n'){finish();resolve(value);return;}if(char==='\u007f'||char==='\b')value=value.slice(0,-1);else if(char>=' ')value+=char;}}process.stdin.on('data',onData);});
+if(password.length<12||password.length>200)throw Error('La password deve contenere tra 12 e 200 caratteri. Nessuna modifica effettuata.');
+const salt=randomBytes(16).toString('hex'),stored=salt+':'+scryptSync(password,salt,64).toString('hex');
+const sql=neon(process.env.DATABASE_URL||process.env.POSTGRES_URL);
+const [rows]=await sql.transaction([sql.query('UPDATE cm_owner SET password_hash=$1,session_version=session_version+1 WHERE id=1 RETURNING id',[stored]),sql.query('UPDATE cm_grants SET revoked=true'),sql.query('DELETE FROM cm_codes')]);
+console.log(rows.length?'Password aggiornata. Sessioni e collegamenti Claude revocati.':'Nessun proprietario attivato: usa la prima attivazione tramite /login.');
