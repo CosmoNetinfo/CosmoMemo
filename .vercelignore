@@ -1,0 +1,8 @@
+.git
+.github
+node_modules
+.next
+coverage
+playwright-report
+test-results
+*.log
