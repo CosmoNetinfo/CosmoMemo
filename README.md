@@ -110,6 +110,8 @@ npm run db:migrate
 
 **Non usare il prefisso `NEXT_PUBLIC_` per questi valori.** Non inserire credenziali nella repository, negli URL MCP o nella chat. `.env.local` è escluso da Git e dagli upload Vercel.
 
+Il file `.env.example` lascia vuoti i campi riservati: non fornisce password predefinite. Le credenziali usate dai test sono generate casualmente durante l’esecuzione e non consentono l’accesso all’app pubblicata. Per controllare i file tracciati esegui `node scripts/check-repository.mjs`; con `--history` vengono controllati anche gli oggetti raggiungibili della cronologia Git. Quando le variabili server sono disponibili localmente, il controllo confronta i file con quei valori senza stamparli. Lo stesso controllo sui file tracciati viene eseguito in GitHub Actions. È un controllo aggiuntivo, non una garanzia di rilevare qualunque tipo di segreto.
+
 Lo script `scripts/configure-cloud.mjs` automatizza la configurazione nel progetto Vercel già collegato; richiede il percorso del CLI Vercel, un account autenticato e un URL HTTPS. Genera le chiavi senza stamparle e salva le istruzioni di attivazione nella cartella superiore al repository. Conserva i valori locali se lo riesegui: non rigenerare il segreto di sessione di un’app già in uso senza pianificare la disconnessione delle sessioni esistenti.
 
 I deployment di anteprima non ricevono automaticamente accesso al database personale. Per provarli, usa ambiente e database isolati; non assegnare le credenziali di produzione a ogni preview.
