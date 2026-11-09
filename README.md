@@ -51,6 +51,7 @@ Controlla i ricordi da **Memoria di Claude**. Puoi correggerli, eliminarli o esp
 | Strumento | Funzione |
 | --- | --- |
 | `get_context` | Albero, ricordi recenti autorizzati, attività aperte e novità in una chiamata |
+| `search_all` | Ricerca unica in pagine, attività e ricordi autorizzati |
 | `list_pages` | Cerca ed elenca le pagine |
 | `read_page` | Legge contenuto e revisione individuale della pagina |
 | `search_pages` | Cerca nel testo delle pagine con estratti, sezione e ID dei blocchi |
@@ -58,12 +59,18 @@ Controlla i ricordi da **Memoria di Claude**. Puoi correggerli, eliminarli o esp
 | `create_page_from_markdown` | Trasforma il contenuto di un file MD in una pagina a blocchi |
 | `export_page_markdown` | Restituisce il Markdown della pagina e il nome del file |
 | `update_page` | Modifica o aggiunge blocchi con controllo della revisione |
+| `set_page_properties` | Riclassifica tipo e stato delle pagine senza riscrivere i blocchi |
+| `get_project` | Legge il progetto e le sue attività, con conteggi e paginazione |
 | `read_section` | Legge una sezione e le sue sottosezioni |
 | `append_to_section` | Inserisce Markdown alla fine della sezione scelta |
 | `update_block` | Modifica un blocco conservandone l’identificatore |
+| `insert_block` | Inserisce un blocco prima/dopo un altro, all’inizio o in fondo |
+| `delete_block` | Elimina un blocco senza modificare gli altri |
 | `move_page` | Sposta una pagina sotto un’altra o al livello principale |
 | `restore_page` | Ripristina una pagina dal cestino |
 | `delete_page` | Sposta una pagina nel cestino; conserva le sottopagine |
+| `list_trash` | Elenca soltanto le pagine nel cestino con ID e revisioni |
+| `empty_trash` | Elimina definitivamente le pagine selezionate e le loro copie storiche |
 | `list_tasks` | Legge le attività |
 | `save_task` | Crea o aggiorna un’attività |
 | `delete_task` | Elimina una singola attività con controllo della revisione |
@@ -78,6 +85,31 @@ Controlla i ricordi da **Memoria di Claude**. Puoi correggerli, eliminarli o esp
 
 I permessi OAuth distinguono lettura e scrittura di pagine e memoria. Gli strumenti non autorizzati non vengono esposti. Dalle impostazioni di CosmoMemo puoi revocare un collegamento; i relativi token vengono invalidati anche se Claude li conserva.
 
+### Correzioni e strumenti della versione 3.2
+
+Aggiorna o ricollega il connettore per scaricare i nuovi schemi. `get_context.server_version` deve riportare `3.2.0`. Tipo/stato e collegamenti ai progetti erano già supportati dalla 3.1 tramite `update_page` e `list_tasks(project_id)`; ora hanno strumenti dedicati più facili da individuare.
+
+- **Checkbox Markdown:** corrette le liste con righe vuote e paragrafi multipli, in cui il parser manteneva il marcatore della checkbox anche nel testo. Ora import/export non aggiunge prefissi duplicati. Un secondo marcatore scritto intenzionalmente nel contenuto viene conservato. La correzione vale per nuove importazioni, senza riscrivere automaticamente le pagine già salvate.
+- **Ricerca per parole:** `search_pages(query:"vigilant curl")` usa `mode:"all"` e trova pagine che contengono entrambe le parole, anche nel titolo e in blocchi diversi. `mode:"any"` trova almeno una parola; `mode:"phrase"` richiede la frase esatta. Il confronto è per sottostringhe, senza distinzione di maiuscole e accenti, senza stemming o ricerca semantica. `list_pages.query` e `search_memories.query` mantengono il filtro per frase dichiarato nelle descrizioni.
+- **Ricerca unica:** `search_all` applica le tre modalità a pagine attive, attività (anche titolo del progetto) e ricordi autorizzati. Restituisce gruppi separati con estratti, `total` e `next_offset`; `limit` vale per ciascun gruppo. Per continuare in una categoria usa `kinds:["page"]`, `["task"]` oppure `["memory"]` con il suo `next_offset`. Un connettore con sola lettura della memoria può cercare soltanto nei ricordi. Nell’app **Cerca** mostra le tre categorie e permette di scegliere la modalità; in locale cerca in pagine e attività.
+- **Revisioni coerenti per entità:** `expected_page_revision`, `expected_task_revision`, **`expected_memory_revision`**. Per `remember` e `forget` il vecchio `expected_revision` resta un alias; se entrambi i parametri dei ricordi sono forniti con valori diversi la chiamata viene rifiutata. Un nuovo ricordo usa revisione 0. Gli strumenti pagina/attività continuano a rifiutare il vecchio parametro globale, per evitare sovrascritture da schemi obsoleti.
+- **Proprietà e progetti:** `set_page_properties(page_id,expected_page_revision,kind,status)` cambia soltanto i campi forniti e conserva i blocchi. `get_project(project_id,include_completed,limit,offset)` restituisce la pagina, le attività collegate, il totale e quelle completate. Nell’app le proprietà sono sotto il titolo e le attività sono visibili nella pagina di tipo Progetto.
+- **Blocchi singoli:** `insert_block(page_id,expected_page_revision,block,before_block_id)` inserisce prima di un blocco. In alternativa usa `after_block_id` per inserire dopo, oppure `after_block_id:null` per l’inizio. Senza ancoraggio inserisce in fondo. `delete_block(page_id,block_id,expected_page_revision)` elimina soltanto quel blocco; anche l’ultimo può essere eliminato. Gli altri ID restano invariati e il contenuto precedente è recuperabile dalla cronologia.
+
+#### Contesto compatto
+
+`get_context` usa `mode:"compact"` per impostazione predefinita: massimo 20 pagine nell’albero, 5 ricordi con estratti da 240 caratteri, 10 attività e 5 novità. Il contenuto JSON è limitato a 16.000 caratteri. Con `mode:"full"` i valori predefiniti sono 100 pagine, 15 ricordi con estratti da 4.000 caratteri, 40 attività e 20 novità, entro 60.000 caratteri. Anche la modalità full resta limitata.
+
+Puoi specificare `page_limit`, `memory_limit`, `task_limit`, `change_limit` e `max_chars` (2.000–60.000). Controlla `page_tree.truncated`, `memories_truncated`, `content_truncated`, `tasks_truncated`, `changes.has_more` e `budget_truncated`. I titoli molto lunghi sono abbreviati. Il budget può ridurre il numero di elementi rispetto ai limiti richiesti. Gli estratti dei ricordi vengono limitati già nella query SQL; per il contenuto completo usa `search_memories` con la chiave. Se il budget elimina delle novità, `next_cursor` resta sull’ultima effettivamente restituita: non vengono segnate come lette modifiche non viste.
+
+#### Elencare e svuotare il cestino
+
+`list_trash(limit,offset)` fornisce ID e revisioni soltanto delle pagine eliminate. Dopo conferma esplicita dell’utente, chiama `empty_trash` con `pages:[{page_id,expected_page_revision},…]` e `confirm_permanent_deletion:true`. La cancellazione è atomica, fino a 200 pagine per chiamata. Revisioni obsolete o pagine non più nel cestino fanno fallire tutto il lotto. Le pagine aggiunte al cestino dopo la selezione restano intatte.
+
+Nell’app usa **Cestino → Svuota cestino → Conferma eliminazione definitiva**. Le sottopagine vengono conservate al livello principale; le attività vengono conservate e scollegate. Vengono rimosse dal database attivo anche le copie del contenuto di quelle pagine nella cronologia; restano i metadati degli eventi e i loro ID per mantenere validi i punti di lettura. La cancellazione non elimina copie precedentemente esportate o backup del provider. La modalità locale continua a offrire il ripristino; lo svuotamento definitivo è disponibile nel cloud.
+
+Prima del deploy esegui `npm run db:migrate`: aggiunge la funzione di cancellazione e i relativi permessi, senza svuotare il cestino né modificare i contenuti esistenti. Non servono nuove variabili d’ambiente.
+
 ### Progetti, cronologia e novità nella versione 3.1
 
 Ogni pagina può avere `kind`: `note` (Appunto), `idea` (Idea), `project` (Progetto); e `status`: `draft` (Bozza), `active` (In corso), `done` (Completato), `archived` (Archiviato). Le pagine precedenti senza questi campi sono mostrate come Appunto/Bozza. Modificali nelle proprietà della pagina, oppure con `create_page`, `create_page_from_markdown` e `update_page`. `list_pages` accetta filtri `kind` e `status`.
@@ -90,13 +122,13 @@ Seleziona **Prima della modifica** o **Dopo la modifica**, controlla l’antepri
 
 **Cosa è cambiato** elenca pagine, attività e ricordi modificati dalla tua ultima lettura. Non azzera le novità quando apri la schermata: usa **Segna queste modifiche come lette** dopo averle consultate. Per Claude, `get_context` comprende anche `changes`; con `get_changes` puoi continuare usando `since_cursor: next_cursor` finché `has_more` è falso. Solo dopo aver letto e riassunto gli eventi richiama `mark_changes_seen(cursor: next_cursor)`. Il punto di lettura è persistente, separato tra app e ciascun client OAuth, e condiviso tra le conversazioni dello stesso connettore. Un cursore già avanzato non torna indietro. Il feed espone riepiloghi e campi cambiati, non copie complete dei documenti; i ricordi vengono omessi se manca `memory:read`.
 
-I 25 strumenti richiedono di aggiornare o ricollegare il connettore per ricaricare gli schemi. Non servono nuove variabili d’ambiente. Prima del deploy esegui `npm run db:migrate` sul database corretto: aggiunge tabelle, trigger e funzioni senza sostituire i contenuti. Le scritture di una vecchia versione del server durante il passaggio sono etichettate **Client precedente**, senza attribuirle a te o a Claude. La cronologia resta nel database e cresce con i salvataggi; il backup JSON dell’app include lo stato corrente di pagine e attività, non la cronologia né i punti di lettura. Per trasferire anche quelli usa un backup PostgreSQL completo.
+I 32 strumenti richiedono di aggiornare o ricollegare il connettore per ricaricare gli schemi. Non servono nuove variabili d’ambiente. Prima del deploy esegui `npm run db:migrate` sul database corretto: aggiunge tabelle, trigger e funzioni senza sostituire i contenuti. Le scritture di una vecchia versione del server durante il passaggio sono etichettate **Client precedente**, senza attribuirle a te o a Claude. La cronologia resta nel database e cresce con i salvataggi; il backup JSON dell’app include lo stato corrente di pagine e attività, non la cronologia né i punti di lettura. Per trasferire anche quelli usa un backup PostgreSQL completo.
 
 Il permesso `pages:write` include la cancellazione: `delete_page` usa il cestino, con ripristino dall’app, mentre `delete_task` elimina definitivamente l’attività. Le sottopagine dirette della pagina eliminata restano disponibili al livello principale. La memoria viene eliminata con `forget`, nel permesso `memory:write`. Tutte queste operazioni richiedono una revisione recente e sono dichiarate distruttive nei metadati MCP. Dopo un aggiornamento, se Claude mostra ancora l’elenco precedente, aggiorna o ricollega il connettore per ricaricare gli strumenti.
 
 ### Revisioni per pagina nella versione 3
 
-Ricarica il sito e aggiorna o ricollega il connettore dopo l’aggiornamento dalla versione 2. Le scritture sulle pagine usano **`expected_page_revision`**, ottenuta da `read_page.revision` oppure `page.revision`. Le attività usano **`expected_task_revision`**, presente nell’attività letta con `list_tasks` o `get_context`. La memoria mantiene `expected_revision`. Il contatore `workspace_revision` serve alla sincronizzazione, non va passato come revisione di una pagina.
+Ricarica il sito e aggiorna o ricollega il connettore dopo l’aggiornamento dalla versione 2. Le scritture sulle pagine usano **`expected_page_revision`**, ottenuta da `read_page.revision` oppure `page.revision`. Le attività usano **`expected_task_revision`**, presente nell’attività letta con `list_tasks` o `get_context`. La memoria usa **`expected_memory_revision`**; `expected_revision` resta un alias compatibile soltanto per i ricordi. Il contatore `workspace_revision` serve alla sincronizzazione, non va passato come revisione di una pagina.
 
 Le nuove chiavi distinte impediscono che un client con il vecchio schema interpreti per errore una revisione globale come revisione di una pagina. Le chiamate vecchie non conformi vengono rifiutate: occorre ricaricare gli strumenti. Le creazioni non dipendono dalla revisione di altri elementi.
 

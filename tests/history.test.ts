@@ -90,7 +90,7 @@ test('MCP: proprietà, progetto, cronologia, ripristino e contesto persistono tr
   assert.equal((await call('restore_page_version',{page_id:project.page.id,event_id:event,side:'before',expected_page_revision:2})).data.revision,3);
   const {data:context}=await call('get_context');assert.equal(context.changes.events.length,4);assert.equal(context.open_tasks.find((t:{id:string})=>t.id===task.task.id).project_id,project.page.id);
   await call('mark_changes_seen',{cursor:context.changes.next_cursor});assert.equal((await call('get_changes')).data.events.length,0);
-  const tools=await client.listTools();assert.equal(tools.tools.length,22);
+  const tools=await client.listTools();assert.equal(tools.tools.length,29);
   const readerServer=createMcpServer(db,['pages:read'],'client-test'),readerClient=new Client({name:'new-chat',version:'1'}),readerPair=InMemoryTransport.createLinkedPair();await readerServer.connect(readerPair[0]);await readerClient.connect(readerPair[1]);
   try{assert.equal((await readerClient.listTools()).tools.some(t=>t.name==='restore_page_version'),false);const r=await readerClient.callTool({name:'get_changes',arguments:{}});assert.equal(JSON.parse((r.content as {text:string}[])[0].text).events.length,0);}finally{await readerClient.close();await readerServer.close();}
  }finally{await client.close();await server.close();await pg.close();}

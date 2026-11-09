@@ -3,9 +3,10 @@ import {mockCloud} from './helpers/cloud';
 
 test('importa un brief Markdown nell’app e lo esporta conservando checkbox e codice',async({page})=>{
  const cloud=await mockCloud(page);
- await page.locator('input[type=file]').setInputFiles({name:'brief.md',mimeType:'text/markdown',buffer:Buffer.from('# Brief nuovo\n\n## Todo\n\n- [x] Prima scelta\n- [ ] Seconda scelta\n\n3. Terza\n4. Quarta\n\n```js\nconst idea = true;\n```')});
+ await page.locator('input[type=file]').setInputFiles({name:'brief.md',mimeType:'text/markdown',buffer:Buffer.from('# Brief nuovo\n\n## Todo\n\n- [x] Prima scelta\n\n- [ ] Seconda scelta\n\n3. Terza\n4. Quarta\n\n```js\nconst idea = true;\n```')});
  await expect(page.getByRole('textbox',{name:'Titolo della pagina'})).toHaveValue('Brief nuovo');
  await expect(page.locator('.block-todo input').first()).toBeChecked();await expect(page.locator('.block-todo input').nth(1)).not.toBeChecked();
+ await expect(page.locator('.block-todo [contenteditable]').first()).toHaveText('Prima scelta');await expect(page.locator('.block-todo [contenteditable]').nth(1)).toHaveText('Seconda scelta');
  await expect(page.locator('.block-numbered')).toHaveCount(2);await expect(page.locator('.block-code')).toContainText('const idea = true;');
  await expect.poll(()=>cloud.workspace.pages.some(p=>p.title==='Brief nuovo')).toBe(true);
  await page.getByRole('button',{name:'Menu dello spazio'}).click();

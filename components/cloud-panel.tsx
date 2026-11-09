@@ -2,8 +2,8 @@
 import {useEffect,useRef,useState} from 'react';
 import {Brain,Plus,RefreshCw,Trash2,Pencil,Download,Link2,LogOut,ArrowUpRight} from 'lucide-react';
 import type {Memory} from '@/lib/cloud/store';
-export function MemoryPanel({connected,refreshToken=0}:{connected:boolean;refreshToken?:number}){
- const [items,setItems]=useState<Memory[]>([]),[query,setQuery]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(false),[editing,setEditing]=useState<Memory|null>(null),[key,setKey]=useState(''),[content,setContent]=useState(''),[tags,setTags]=useState(''),[saving,setSaving]=useState(false),[deleting,setDeleting]=useState('');
+export function MemoryPanel({connected,refreshToken=0,initialQuery=''}:{connected:boolean;refreshToken?:number;initialQuery?:string}){
+ const [items,setItems]=useState<Memory[]>([]),[query,setQuery]=useState(initialQuery),[error,setError]=useState(''),[loading,setLoading]=useState(false),[editing,setEditing]=useState<Memory|null>(null),[key,setKey]=useState(''),[content,setContent]=useState(''),[tags,setTags]=useState(''),[saving,setSaving]=useState(false),[deleting,setDeleting]=useState('');
  const loadSequence=useRef(0);
  async function load(search=query){const sequence=++loadSequence.current;setLoading(true);try{const response=await fetch('/api/memories?q='+encodeURIComponent(search),{cache:'no-store',signal:AbortSignal.timeout(15000)});const body=await response.json();if(!response.ok)throw Error(body.error);if(sequence===loadSequence.current){setItems(body.memories);setError('');}}catch(e){if(sequence===loadSequence.current)setError(e instanceof Error?e.message:'Memoria non disponibile.');}finally{if(sequence===loadSequence.current)setLoading(false);}}
  useEffect(()=>{if(connected)void load(query);return()=>{loadSequence.current+=1;};},[connected,refreshToken]);

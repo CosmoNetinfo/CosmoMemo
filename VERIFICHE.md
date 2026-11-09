@@ -1,5 +1,13 @@
 # Verifiche — 8 novembre 2026
 
+## Versione 3.2 — regressioni Markdown, ricerca e strumenti MCP · 9 novembre 2026
+
+- Ventiquattro gruppi di test applicativi: riproduzione del difetto nelle checkbox con liste loose, import/export ripetuto senza prefissi duplicati, conservazione di marcatori letterali, ricerca AND tra titolo e blocchi, OR/frase, ricerca unica e filtri dei permessi.
+- SDK MCP reale: riclassificazione senza modificare blocchi, lettura del progetto e attività, inserimento ancorato di blocchi, cancellazione mirata e rifiuto di revisioni obsolete; revisione dei ricordi con nome coerente, alias compatibile e rifiuto di valori discordanti.
+- PostgreSQL embedded: cancellazione confermata del cestino, conflitto atomico, conservazione e scollegamento di attività e sottopagine, rimozione del contenuto delle copie storiche e conservazione delle pagine finite nel cestino dopo la selezione.
+- Contesto compatto verificato con ricordi lunghi: limite della risposta serializzata, estratti e indicatori di troncamento; il cursore delle novità non supera gli eventi effettivamente restituiti.
+- Diciannove test browser sulla build locale di produzione con API simulate, inclusi checkbox loose, ricerca unica per categorie e modalità, apertura del ricordo cercato, svuotamento solo dopo conferma ed errore di rete senza perdita delle pagine.
+
 ## Versione 3.1 — progetti, cronologia e novità · 9 novembre 2026
 
 - Diciotto gruppi di test applicativi con PostgreSQL embedded e SDK MCP: proprietà delle pagine, attività collegate, integrità dei progetti anche nel controllo SQL finale, cronologia atomica, autori assegnati dal server, ripristino delle versioni precedenti, rifiuto di revisioni obsolete e assenza di eventi per operazioni fallite.

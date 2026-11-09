@@ -22,6 +22,25 @@ test('Markdown non esegue HTML e conserva le tabelle, con avvisi espliciti',()=>
  assert.throws(()=>parseMarkdown('x'.repeat(500001)));
  assert.equal(parseMarkdown('# Rimane titolo',{extractTitle:false}).blocks[0].type,'h1');
 });
+
+test('checkbox in liste loose: il marcatore strutturale viene rimosso una sola volta',()=>{
+ const source='# Brief\n\n- [ ] Prima attività\n\n- [x] Seconda attività\n\n  Paragrafo aggiuntivo\n\n  - [ ] Sottoattività\n\n- [ ] [x] Testo letterale\n\n- \\[ \\] Testo normale';
+ const imported=parseMarkdown(source),todo=imported.blocks.filter(b=>b.type==='todo');
+ assert.deepEqual(todo.map(b=>b.text),['Prima attività','Seconda attività','Sottoattività','[x] Testo letterale']);
+ assert.deepEqual(todo.map(b=>b.checked),[false,true,false,false]);
+ const page={...initial.pages[0],title:imported.title,blocks:imported.blocks};
+ const twice=parseMarkdown(pageToMarkdown(page));assert.deepEqual(twice.blocks.filter(b=>b.type==='todo').map(b=>({text:b.text,checked:b.checked})),todo.map(b=>({text:b.text,checked:b.checked})));
+ assert.equal(parseMarkdown('- [x] Stretto').blocks[0].text,'Stretto');
+ assert.equal(parseMarkdown('- [ ] [x] Intenzionale').blocks[0].text,'[x] Intenzionale');
+});
+
+test('ricerca per parole: AND attraverso blocchi e titolo, OR e frase espliciti',()=>{
+ const page={...initial.pages[0],title:'Vigilant',blocks:parseMarkdown('Un esempio di curl\n\nVerifica separata',{extractTitle:false}).blocks},workspace={...initial,pages:[page]};
+ assert.equal(searchPages(workspace,'vigilant curl').total,1);assert.equal(searchPages(workspace,'vigilant curl',20,0,'phrase').total,0);
+ assert.equal(searchPages(workspace,'curl assente').total,0);assert.equal(searchPages(workspace,'curl assente',20,0,'any').total,1);
+ assert.equal(searchPages(workspace,'CURL verifica').results[0].matches.length,2);assert.equal(searchPages(workspace,'  VIGILANT   curl  ').total,1);
+ assert.equal(searchPages({...workspace,pages:[{...page,deleted:true}]},'curl').total,0);
+});
 test('sezioni annidate, titoli ripetuti e ricerca testuale con blocco ed estratto',()=>{
  const blocks=parseMarkdown('## Todo\n\n- [ ] Ricordare la possibilità speciale\n\n### Sotto\n\nDettaglio\n\n## Decisioni\n\nScelta definitiva\n\n## Todo\n\nSeconda lista',{extractTitle:false}).blocks;
  const page:Page={...initial.pages[0],title:'Progetto',blocks,revision:4};
