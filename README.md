@@ -216,6 +216,7 @@ npm run db:migrate
 | `COSMOMEMO_APP_URL` | Origine HTTPS stabile dell’app, per esempio `https://cosmo-memo.vercel.app`. In locale: `http://localhost:5173`. |
 | `COSMOMEMO_SESSION_SECRET` | Segreto casuale di almeno 32 caratteri per firmare sessioni e consenso. |
 | `COSMOMEMO_SETUP_TOKEN` | Codice casuale diverso dal precedente, da consegnare privatamente al proprietario per la prima attivazione. |
+| `COSMOMEMO_READ_TOKEN` | Opzionale: token server separato per il riepilogo metadati di Cosmo Control. Se assente o vuoto, l’endpoint restituisce 404. |
 
 **Non usare il prefisso `NEXT_PUBLIC_` per questi valori.** Non inserire credenziali nella repository, negli URL MCP o nella chat. `.env.local` è escluso da Git e dagli upload Vercel.
 
@@ -224,6 +225,44 @@ Il file `.env.example` lascia vuoti i campi riservati: non fornisce password pre
 Lo script `scripts/configure-cloud.mjs` automatizza la configurazione nel progetto Vercel già collegato; richiede il percorso del CLI Vercel, un account autenticato e un URL HTTPS. Genera le chiavi senza stamparle e salva le istruzioni di attivazione nella cartella superiore al repository. Conserva i valori locali se lo riesegui: non rigenerare il segreto di sessione di un’app già in uso senza pianificare la disconnessione delle sessioni esistenti.
 
 I deployment di anteprima non ricevono automaticamente accesso al database personale. Per provarli, usa ambiente e database isolati; non assegnare le credenziali di produzione a ogni preview.
+
+## Cosmo Control: riepilogo di sola lettura
+
+`GET https://cosmo-memo.vercel.app/api/read-only/summary` è un’integrazione server-to-server indipendente da login, cookie, sessioni e OAuth MCP. Richiede esclusivamente `Authorization: Bearer <token>`, confrontato con `COSMOMEMO_READ_TOKEN` mediante `crypto.timingSafeEqual` su digest SHA-256 di lunghezza fissa.
+
+La risposta ha questa struttura:
+
+```json
+{
+  "generated_at": "2026-11-09T12:00:00.000Z",
+  "pages": [{"id":"page-id","title":"Progetto","kind":"project","status":"active","parent_id":null,"updated":1794225600000}],
+  "tasks": [{"id":"task-id","title":"Preparare il brief","status":"In corso","priority":"Alta","project_id":"page-id","due":"2026-11-12"}],
+  "memories_count": 0
+}
+```
+
+Include le pagine fuori dal cestino e tutte le attività. `parent_id` deriva da `parent`, `due` da `date`; scadenze vuote e collegamenti assenti diventano `null`. Per le pagine precedenti senza tipo/stato restituisce `note`/`draft`. `updated` resta un timestamp in millisecondi, `generated_at` è una data ISO UTC. Nessun blocco, contenuto di pagina, chiave/testo/tag di ricordo o dettaglio di autenticazione viene restituito.
+
+La proiezione avviene direttamente in un’unica query `SELECT` PostgreSQL. Non usa `snapshot()` e non inizializza il workspace: se il workspace non è ancora presente restituisce liste vuote. Non scrive su Neon, neppure per il rate limit; non richiede migrazioni.
+
+Tutte le risposte hanno `Cache-Control: no-store`. Variabile assente o vuota: **404**; token mancante, errato o header non Bearer: **401**, anche in presenza di un cookie valido. Errori del database: **503** con messaggio generico. Non inviare il token in URL o parametri di query.
+
+Il rate limit conserva solo contatori in memoria: dopo **10 fallimenti in una finestra di 60 secondi**, i tentativi da quella sorgente vengono bloccati fino alla scadenza, sempre con **401** e `Retry-After` in secondi. Le richieste valide non incrementano il contatore; durante il blocco anche un token corretto deve attendere la scadenza. Su Vercel la sorgente è l’IP fornito da `x-vercel-forwarded-for`; fuori da Vercel viene usato un bucket comune. La memoria è limitata e non conserva i token. Il contatore è **per istanza**, si azzera al riavvio e non è distribuito tra più istanze Vercel.
+
+### Attivazione su Vercel
+
+1. Genera localmente un segreto casuale distinto da password, setup token e segreto di sessione:
+
+   ```bash
+   node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
+   ```
+
+2. Nel progetto **cosmo-memo**, apri **Settings → Environment Variables**, aggiungi **`COSMOMEMO_READ_TOKEN`**, incolla il segreto, seleziona **Production** e abilita **Sensitive**. Non usare `NEXT_PUBLIC_` e non aggiungerlo a Preview se non vuoi attivare l’endpoint anche lì.
+3. Salva ed esegui un nuovo deploy: le modifiche alle variabili non cambiano un deployment già esistente. [Gestione variabili Vercel](https://vercel.com/docs/environment-variables/managing-environment-variables) · [Variabili Sensitive](https://vercel.com/docs/environment-variables/sensitive-environment-variables).
+4. Conserva lo stesso token nelle variabili **server** del gestionale Cosmo Control e invialo nell’header Authorization dalle sue richieste backend. Non inserirlo nel codice frontend, nei log o nella repository.
+5. Per disattivare l’integrazione, rimuovi la variabile da CosmoMemo e ridistribuisci: il percorso torna a restituire 404. Per ruotare il token, sostituisci il valore su entrambi i servizi e ridistribuiscili.
+
+I controlli repository e bundle pubblico includono anche `COSMOMEMO_READ_TOKEN`. `.env.example` lo lascia vuoto; l’integrazione rimane disattivata finché non la configuri.
 
 ## Trasferire i dati locali
 

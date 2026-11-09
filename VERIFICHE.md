@@ -1,5 +1,12 @@
 # Verifiche — 8 novembre 2026
 
+## Riepilogo read-only per Cosmo Control
+
+- Trentanove gruppi di test applicativi passati, con nove nuovi test per `GET /api/read-only/summary`: token valido/errato/mancante, variabile assente o vuota, lettura della variabile reale dalla route Next, indipendenza dai cookie, formato Bearer, rate limit con scadenza e gestione degli errori senza dettagli riservati.
+- Proiezione verificata con PostgreSQL embedded in una transazione `READ ONLY`: un’unica `SELECT`, chiavi esatte di risposta, esclusione del cestino, mapping di genitore/scadenza, conteggio dei ricordi senza chiavi/testi/tag e nessun contenuto dei blocchi.
+- Workspace non inizializzato: liste vuote senza creazione del record. Nessuna query su richieste non autenticate o con endpoint disattivato; nessuna scrittura neppure per il rate limit, mantenuto in memoria per istanza.
+- Build Next.js con route dinamica e controllo del bundle pubblico superati. Gli scanner delle credenziali includono `COSMOMEMO_READ_TOKEN`; il suo valore non viene impostato o salvato nei file tracciati.
+
 ## Versione 3.3.0 — data del cestino e scritture protette · 9 novembre 2026
 
 - Trenta gruppi di test applicativi, inclusi sei nuovi: data server del cestinamento, conservazione durante modifiche, rimozione al ripristino ordinario/storico e nuova data al cestinamento successivo; migrazione idempotente e date locali.

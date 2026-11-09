@@ -6,7 +6,7 @@ const git=(...args)=>execFileSync('git',args,{encoding:'utf8',maxBuffer:20_000_0
 const files=git('ls-files','-z').split('\0').filter(Boolean);
 const prohibited=files.filter(file=>/(^|\/)\.env(?:\.|$)/.test(file)&&!file.endsWith('/.env.example')&&file!=='.env.example'||/(^|\/)cosmomemo-accesso\.txt$|\.(?:pem|key)$/i.test(file));
 if(prohibited.length)throw Error('File riservati tracciati da Git: '+prohibited.join(', '));
-const keys=['DATABASE_URL','POSTGRES_URL','PGPASSWORD','POSTGRES_PASSWORD','COSMOMEMO_SESSION_SECRET','COSMOMEMO_SETUP_TOKEN'];
+const keys=['DATABASE_URL','POSTGRES_URL','PGPASSWORD','POSTGRES_PASSWORD','COSMOMEMO_SESSION_SECRET','COSMOMEMO_SETUP_TOKEN','COSMOMEMO_READ_TOKEN'];
 const secrets=keys.map(key=>process.env[key]).filter(value=>value&&value.length>=12);
 if(process.env.DATABASE_URL){try{const password=decodeURIComponent(new URL(process.env.DATABASE_URL).password);if(password.length>=12)secrets.push(password);}catch{}}
 const violations=[];
