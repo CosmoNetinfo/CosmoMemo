@@ -146,6 +146,8 @@ Non è stato eseguito un audit indipendente di sicurezza. La prima versione rest
 
 ## Struttura
 
+L’icona di CosmoMemo è un SVG originale in `public/icons/cosmomemo.svg`. Il taccuino e la stella sono usati nella barra laterale, come favicon e nelle icone per la schermata iniziale. Per rigenerare i formati PNG, Apple e ICO esegui `node scripts/generate-icons.mjs`. Il manifest include icone 192/512 e una variante Android maskable; la variante Apple ha dimensione 180×180 e sfondo opaco.
+
 - `app/page.tsx`, `app/globals.css`: editor e workspace.
 - `app/login`, `app/oauth`, `app/mcp`: accesso personale, autorizzazione e connettore remoto.
 - `app/api`: API protette per pagine, ricordi e collegamenti.

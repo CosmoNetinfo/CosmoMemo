@@ -31,6 +31,7 @@
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "sharp": "0.35.5",
     "tailwindcss": "4.2.1",
     "tsx": "^4.23.15",
     "typescript": "5.9.3"

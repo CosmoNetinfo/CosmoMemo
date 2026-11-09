@@ -1,5 +1,12 @@
 # Verifiche — 8 novembre 2026
 
+## Icona web app — 9 novembre 2026
+
+- Nuovo simbolo vettoriale originale, con taccuino, segnalibro e stella, verificato visivamente a 256, 128, 64, 32 e 16 pixel.
+- Verificate le dimensioni PNG 32, 180, 192 e 512; sfondo opaco per Apple e Android maskable. Verificato anche il ritaglio circolare Android.
+- Metadata aggiornati per favicon SVG/PNG/ICO, icona Apple e manifest con icone standard e maskable.
+- Build Next.js e controllo TypeScript riusciti.
+
 ## Versione 2.1.1 — pulsante Sincronizza, 9 novembre 2026
 
 - Nove test browser sulla build di produzione: aggiornamento di pagine ed editor, conferma senza nuove versioni, aggiornamento dei ricordi a revisione workspace invariata, salvataggio delle modifiche pendenti prima della lettura, errori 503 e sessione 401, stato di caricamento e risposta lenta, pagina eliminata da remoto, salvataggio fallito e conflitto concorrente.
