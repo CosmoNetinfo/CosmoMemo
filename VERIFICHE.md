@@ -1,5 +1,14 @@
 # Verifiche — 8 novembre 2026
 
+## Versione 2.1 — cancellazione tramite Claude, 9 novembre 2026
+
+- Aggiunti gli strumenti MCP `delete_page` e `delete_task`, entrambi nel permesso `pages:write` e dichiarati distruttivi.
+- Test con SDK MCP e PostgreSQL embedded: pagina spostata nel cestino, contenuto conservato per il ripristino, sottopagine dirette spostate al livello principale e discendenti preservati.
+- Test di cancellazione delle attività: rimozione del solo elemento richiesto, rifiuto delle revisioni obsolete, degli identificatori inesistenti e delle cancellazioni ripetute.
+- Verificato che i client con sola lettura non vedano e non possano eseguire gli strumenti di cancellazione.
+- Verificata anche l’eliminazione della memoria tramite `forget`.
+- Sei gruppi di test superati, controllo TypeScript e build di produzione riusciti. I test non utilizzano il database personale dell’utente.
+
 ## Versione 2 — memoria Neon e Claude MCP
 
 - Test con PostgreSQL embedded PGlite: persistenza, aggiornamenti con revisioni, conflitti e cancellazione dei ricordi.

@@ -51,13 +51,17 @@ Controlla i ricordi da **Memoria di Claude**. Puoi correggerli, eliminarli o esp
 | `read_page` | Legge contenuto e revisione |
 | `create_page` | Crea una pagina con blocchi |
 | `update_page` | Modifica o aggiunge blocchi con controllo della revisione |
+| `delete_page` | Sposta una pagina nel cestino; conserva le sottopagine |
 | `list_tasks` | Legge le attività |
 | `save_task` | Crea o aggiorna un’attività |
+| `delete_task` | Elimina una singola attività con controllo della revisione |
 | `search_memories` | Recupera i ricordi pertinenti |
 | `remember` | Crea o aggiorna un ricordo |
 | `forget` | Elimina un ricordo |
 
 I permessi OAuth distinguono lettura e scrittura di pagine e memoria. Gli strumenti non autorizzati non vengono esposti. Dalle impostazioni di CosmoMemo puoi revocare un collegamento; i relativi token vengono invalidati anche se Claude li conserva.
+
+Il permesso `pages:write` include la cancellazione: `delete_page` usa il cestino, con ripristino dall’app, mentre `delete_task` elimina definitivamente l’attività. Le sottopagine dirette della pagina eliminata restano disponibili al livello principale. La memoria viene eliminata con `forget`, nel permesso `memory:write`. Tutte queste operazioni richiedono una revisione recente e sono dichiarate distruttive nei metadati MCP. Dopo un aggiornamento, se Claude mostra ancora l’elenco precedente, aggiorna o ricollega il connettore per ricaricare gli strumenti.
 
 ## Neon e costi
 
