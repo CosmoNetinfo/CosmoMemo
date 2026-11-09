@@ -1,3 +1,4 @@
+import {applySchema} from './helpers/schema';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -10,7 +11,7 @@ import {SCOPES} from '../lib/cloud/oauth';
 
 test('Claude cancella singole pagine e attività con revisioni e conserva le sottopagine',async()=>{
  const pg=new PGlite();
- await pg.exec(readFileSync(new URL('../db/schema.sql',import.meta.url),'utf8'));
+ await applySchema(pg);
  const db=new Store(async(sql,args=[])=>{const result=await pg.query(sql,args);return result.rows as Row[];});
  const server=createMcpServer(db,SCOPES),client=new Client({name:'deletion-test',version:'1'}),pair=InMemoryTransport.createLinkedPair();
  await server.connect(pair[0]);await client.connect(pair[1]);
@@ -22,12 +23,12 @@ test('Claude cancella singole pagine e attività con revisioni e conserva le sot
   const parent=json(await call('create_page',{title:'Genitore da cancellare'})).page;
   const child=json(await call('create_page',{title:'Sottopagina da conservare',parent_id:parent.id})).page;
   const grandchild=json(await call('create_page',{title:'Nipote da conservare',parent_id:child.id})).page;
-  const before=await db.snapshot();
-  assert.equal((await call('delete_page',{page_id:parent.id,expected_revision:before.revision-1})).isError,true);
+  const before=await db.snapshot();const parentRevision=before.workspace.pages.find(p=>p.id===parent.id)!.revision!;
+  assert.equal((await call('delete_page',{page_id:parent.id,expected_page_revision:parentRevision+1})).isError,true);
   assert.equal((await db.snapshot()).workspace.pages.find(p=>p.id===parent.id)?.deleted,false);
-  assert.equal((await call('delete_page',{page_id:'missing',expected_revision:before.revision})).isError,true);
+  assert.equal((await call('delete_page',{page_id:'missing',expected_page_revision:parentRevision})).isError,true);
   assert.equal((await db.snapshot()).revision,before.revision);
-  const removed=json(await call('delete_page',{page_id:parent.id,expected_revision:before.revision}));
+  const removed=json(await call('delete_page',{page_id:parent.id,expected_page_revision:parentRevision}));
   assert.equal(removed.trashed,true);assert.equal(removed.permanently_deleted,false);assert.deepEqual(removed.retained_children,[child.id]);
   const after=await db.snapshot();
   assert.equal(after.workspace.pages.find(p=>p.id===parent.id)?.deleted,true);
@@ -35,20 +36,20 @@ test('Claude cancella singole pagine e attività con revisioni e conserva le sot
   assert.equal(after.workspace.pages.find(p=>p.id===grandchild.id)?.parent,child.id);
   assert.equal(after.workspace.pages.length,before.workspace.pages.length);
   const visible=json(await call('list_pages',{query:'Genitore da cancellare'}));assert.equal(visible.pages.length,0);
-  assert.equal((await call('delete_page',{page_id:parent.id,expected_revision:after.revision})).isError,true);
+  assert.equal((await call('delete_page',{page_id:parent.id,expected_page_revision:after.workspace.pages.find(p=>p.id===parent.id)!.revision!})).isError,true);
   assert.equal((await db.snapshot()).revision,after.revision);
   const task=after.workspace.tasks[0];
-  assert.equal((await call('delete_task',{task_id:task.id,expected_revision:before.revision})).isError,true);
-  assert.equal((await call('delete_task',{task_id:'missing',expected_revision:after.revision})).isError,true);
+  assert.equal((await call('delete_task',{task_id:task.id,expected_task_revision:task.revision!+1})).isError,true);
+  assert.equal((await call('delete_task',{task_id:'missing',expected_task_revision:task.revision!})).isError,true);
   assert.equal((await db.snapshot()).revision,after.revision);
-  const deleted=json(await call('delete_task',{task_id:task.id,expected_revision:after.revision}));assert.equal(deleted.permanently_deleted,true);
+  const deleted=json(await call('delete_task',{task_id:task.id,expected_task_revision:task.revision!}));assert.equal(deleted.permanently_deleted,true);
   const remaining=await db.snapshot();assert.deepEqual(remaining.workspace.tasks,after.workspace.tasks.filter(t=>t.id!==task.id));
-  assert.equal((await call('delete_task',{task_id:task.id,expected_revision:remaining.revision})).isError,true);
+  assert.equal((await call('delete_task',{task_id:task.id,expected_task_revision:task.revision!})).isError,true);
   const readOnly=createMcpServer(db,['pages:read']),reader=new Client({name:'read-only',version:'1'}),linked=InMemoryTransport.createLinkedPair();
   await readOnly.connect(linked[0]);await reader.connect(linked[1]);
   try{
    assert.equal((await reader.listTools()).tools.some(t=>['delete_page','delete_task'].includes(t.name)),false);
-   const denied=await reader.callTool({name:'delete_task',arguments:{task_id:remaining.workspace.tasks[0].id,expected_revision:remaining.revision}}).catch(()=>({isError:true}));
+   const denied=await reader.callTool({name:'delete_task',arguments:{task_id:remaining.workspace.tasks[0].id,expected_task_revision:remaining.workspace.tasks[0].revision!}}).catch(()=>({isError:true}));
    assert.equal(denied.isError,true);assert.equal((await db.snapshot()).revision,remaining.revision);
   }finally{await reader.close();await readOnly.close();}
   const memory=json(await call('remember',{key:'temporary/memory',content:'Ricordo da eliminare'}));

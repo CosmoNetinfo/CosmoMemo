@@ -1,37 +1,15 @@
 import {test,expect,type Page} from '@playwright/test';
 import {initial,type Workspace} from '../../lib/workspace';
 
-async function mockCloud(page:Page){
- const state={workspace:structuredClone(initial),revision:1,memories:[] as {key:string;content:string;tags:string[];revision:number;updatedAt:number}[],failRead:0,failSave:0,holdRead:null as null|{started:()=>void;wait:Promise<void>},events:[] as string[]};
- await page.route('**/api/session',route=>route.fulfill({json:{configured:true,initialized:true,authenticated:true}}));
- await page.route('**/api/memories?**',route=>route.fulfill({json:{memories:state.memories}}));
- await page.route('**/api/workspace',async route=>{
-  const method=route.request().method();state.events.push(method);
-  if(method==='GET'){
-   if(state.failRead){const status=state.failRead;state.failRead=0;await route.fulfill({status,json:{error:'Errore simulato'}});return;}
-   const snapshot={workspace:structuredClone(state.workspace),revision:state.revision};
-   const hold=state.holdRead;state.holdRead=null;if(hold){hold.started();await hold.wait;}
-   await route.fulfill({json:snapshot});return;
-  }
-  if(method==='PUT'){
-   if(state.failSave){const status=state.failSave;state.failSave=0;await route.fulfill({status,json:{error:'Errore simulato'}});return;}
-   const body=route.request().postDataJSON() as {workspace:Workspace;revision:number};
-   if(body.revision!==state.revision){await route.fulfill({status:409,json:{error:'Conflitto'}});return;}
-   state.workspace=structuredClone(body.workspace);state.revision++;
-   await route.fulfill({json:{workspace:state.workspace,revision:state.revision}});return;
-  }
-  await route.fulfill({status:405});
- });
- await page.goto('/');await expect(page.getByText('Salvato in Neon',{exact:true})).toBeVisible();
- return state;
-}
+import {mockCloud} from './helpers/cloud';
+
 const sync=(page:Page)=>page.getByRole('button',{name:'Sincronizza',exact:true});
 const banner=(page:Page)=>page.locator('.cloud-banner');
 
 test('il pulsante aggiorna pagine, editor e mostra la conferma anche senza novità',async({page})=>{
  const cloud=await mockCloud(page);
  await page.getByRole('button',{name:/Benvenuto nel tuo Spazio/}).first().click();
- cloud.workspace.pages[0].title='Aggiornata da Claude';cloud.workspace.pages[0].blocks[1].text='Testo nuovo dal cloud';cloud.revision++;
+ cloud.workspace.pages[0].title='Aggiornata da Claude';cloud.workspace.pages[0].blocks[1].text='Testo nuovo dal cloud';cloud.workspace.pages[0].revision!++;cloud.revision++;
  await sync(page).click();
  await expect(page.getByRole('textbox',{name:'Titolo della pagina'})).toHaveValue('Aggiornata da Claude');
  await expect(page.locator('[contenteditable]').nth(1)).toHaveText('Testo nuovo dal cloud');
@@ -92,7 +70,7 @@ test('una risposta lenta non sostituisce ciò che viene scritto durante la sincr
 
 test('se la pagina aperta è stata cancellata, torna alla home dopo la sincronizzazione',async({page})=>{
  const cloud=await mockCloud(page);await page.getByRole('button',{name:/Benvenuto nel tuo Spazio/}).first().click();
- cloud.workspace.pages[0].deleted=true;cloud.revision++;
+ cloud.workspace.pages[0].deleted=true;cloud.workspace.pages[0].revision!++;cloud.revision++;
  await sync(page).click();await expect(page.getByRole('heading',{name:'Bentornato nel tuo Spazio'})).toBeVisible();
  await expect(page.getByRole('textbox',{name:'Titolo della pagina'})).toHaveCount(0);
 });
@@ -111,7 +89,7 @@ test('un salvataggio fallito conserva la bozza e impedisce di sostituirla con il
 
 test('una modifica concorrente nel cloud ferma la sincronizzazione e conserva entrambe le versioni',async({page})=>{
  const cloud=await mockCloud(page);await page.getByRole('button',{name:/Benvenuto nel tuo Spazio/}).first().click();
- cloud.workspace.pages[0].title='Versione remota da conservare';cloud.revision++;
+ cloud.workspace.pages[0].title='Versione remota da conservare';cloud.workspace.pages[0].revision!++;cloud.revision++;
  await page.getByRole('textbox',{name:'Titolo della pagina'}).fill('Versione locale da conservare');
  await sync(page).click();await expect(page.getByRole('button',{name:'Esporta bozza e ricarica'})).toBeVisible();
  await expect(page.getByRole('textbox',{name:'Titolo della pagina'})).toHaveValue('Versione locale da conservare');

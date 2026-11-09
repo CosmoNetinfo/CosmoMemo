@@ -13,6 +13,8 @@ Pagine, progetti e **memoria persistente per Claude**, con Next.js e PostgreSQL 
 - Memoria esterna con chiavi, contenuti, tag e revisioni, modificabile ed eliminabile dall’app.
 - Server MCP remoto con autorizzazione OAuth, consenso, PKCE S256, rinnovo e revoca dei token.
 - Backup JSON delle pagine, esportazione Markdown ed esportazione separata dei ricordi.
+- Importazione Markdown in blocchi anche tramite Claude, modifica di sezioni e singoli blocchi, ricerca nel contenuto con estratti.
+- Revisioni individuali per pagine e attività, con unione delle modifiche indipendenti tra app e Claude.
 
 Questa versione offre **un solo account proprietario per installazione**. Non è un servizio multiutente. I visitatori senza accesso possono usare solo le pagine locali nel proprio browser; non possono leggere il tuo archivio cloud.
 
@@ -47,10 +49,19 @@ Controlla i ricordi da **Memoria di Claude**. Puoi correggerli, eliminarli o esp
 
 | Strumento | Funzione |
 | --- | --- |
+| `get_context` | Albero delle pagine, ricordi recenti autorizzati e attività aperte in una chiamata |
 | `list_pages` | Cerca ed elenca le pagine |
-| `read_page` | Legge contenuto e revisione |
+| `read_page` | Legge contenuto e revisione individuale della pagina |
+| `search_pages` | Cerca nel testo delle pagine con estratti, sezione e ID dei blocchi |
 | `create_page` | Crea una pagina con blocchi |
+| `create_page_from_markdown` | Trasforma il contenuto di un file MD in una pagina a blocchi |
+| `export_page_markdown` | Restituisce il Markdown della pagina e il nome del file |
 | `update_page` | Modifica o aggiunge blocchi con controllo della revisione |
+| `read_section` | Legge una sezione e le sue sottosezioni |
+| `append_to_section` | Inserisce Markdown alla fine della sezione scelta |
+| `update_block` | Modifica un blocco conservandone l’identificatore |
+| `move_page` | Sposta una pagina sotto un’altra o al livello principale |
+| `restore_page` | Ripristina una pagina dal cestino |
 | `delete_page` | Sposta una pagina nel cestino; conserva le sottopagine |
 | `list_tasks` | Legge le attività |
 | `save_task` | Crea o aggiorna un’attività |
@@ -62,6 +73,26 @@ Controlla i ricordi da **Memoria di Claude**. Puoi correggerli, eliminarli o esp
 I permessi OAuth distinguono lettura e scrittura di pagine e memoria. Gli strumenti non autorizzati non vengono esposti. Dalle impostazioni di CosmoMemo puoi revocare un collegamento; i relativi token vengono invalidati anche se Claude li conserva.
 
 Il permesso `pages:write` include la cancellazione: `delete_page` usa il cestino, con ripristino dall’app, mentre `delete_task` elimina definitivamente l’attività. Le sottopagine dirette della pagina eliminata restano disponibili al livello principale. La memoria viene eliminata con `forget`, nel permesso `memory:write`. Tutte queste operazioni richiedono una revisione recente e sono dichiarate distruttive nei metadati MCP. Dopo un aggiornamento, se Claude mostra ancora l’elenco precedente, aggiorna o ricollega il connettore per ricaricare gli strumenti.
+
+### Revisioni per pagina nella versione 3
+
+Ricarica il sito e aggiorna o ricollega il connettore dopo l’aggiornamento dalla versione 2. Le scritture sulle pagine usano **`expected_page_revision`**, ottenuta da `read_page.revision` oppure `page.revision`. Le attività usano **`expected_task_revision`**, presente nell’attività letta con `list_tasks` o `get_context`. La memoria mantiene `expected_revision`. Il contatore `workspace_revision` serve alla sincronizzazione, non va passato come revisione di una pagina.
+
+Le nuove chiavi distinte impediscono che un client con il vecchio schema interpreti per errore una revisione globale come revisione di una pagina. Le chiamate vecchie non conformi vengono rifiutate: occorre ricaricare gli strumenti. Le creazioni non dipendono dalla revisione di altri elementi.
+
+Due pagine diverse possono essere aggiornate partendo dalla stessa schermata. Se due scritture toccano la **stessa pagina**, la seconda deve rileggerla prima di procedere. Lo stesso vale per sezioni e blocchi della medesima pagina. Un lotto di salvataggio dell’app è atomico: un conflitto non lascia modifiche parziali. Gli aggiornamenti concorrenti di altre pagine vengono conservati e restituiti nella risposta canonica.
+
+Prima di pubblicare questo aggiornamento esegui nuovamente `npm run db:migrate`: aggiunge la funzione PostgreSQL di aggiornamento per elemento, senza sostituire i documenti esistenti. Gli identificatori restano invariati; gli elementi precedenti partono dalla revisione 1. Il formato dei backup resta compatibile con la versione 1 del workspace.
+
+### Markdown, sezioni e ricerca
+
+`create_page_from_markdown` riceve il **contenuto testuale** del file nel parametro `markdown`; il server non accede a percorsi sul computer dell’utente. Il primo titolo H1 diventa il nome della pagina, salvo titolo esplicito diverso. Sono supportati sei livelli di titoli, paragrafi, liste puntate e numerate, checkbox anche annidate, citazioni, blocchi di codice con linguaggio e divisori. I marcatori inline, come grassetto e link, vengono conservati come testo Markdown nell’editor. HTML non viene eseguito; le tabelle sono conservate come codice Markdown e segnalate negli avvisi. Limiti: 500.000 caratteri e 1.000 blocchi per importazione; resta il limite di circa 2 MB per il workspace.
+
+L’importazione di file `.md` dall’app usa lo stesso parser. L’export è disponibile sia dal menu della pagina sia tramite `export_page_markdown`.
+
+Per modificare una sezione, usa il titolo esatto, senza distinzione tra maiuscole e accenti. Se il titolo ricorre più volte, specifica `heading_id` oppure `occurrence` (da 1): non viene scelta una sezione ambigua. Il contenuto comprende le sottosezioni fino al titolo successivo di livello pari o superiore. `append_to_section` inserisce prima di quel confine e conserva gli ID dei blocchi già presenti. `update_block` consente anche di cambiare `checked` di un blocco Todo.
+
+`search_pages` cerca nelle pagine attive e restituisce estratti con pagina, sezione, ID del blocco e revisione. `get_context` restituisce l’albero, i ricordi recenti e le attività aperte con limiti espliciti e indicatori di troncamento. Non aggiunge informazioni della memoria se il connettore non ha il relativo permesso di lettura.
 
 ## Neon e costi
 
@@ -130,7 +161,7 @@ Per trasferire le pagine dal vecchio indirizzo Sites, esporta prima il backup JS
 
 Quando torni nella scheda, l’app recupera gli aggiornamenti cloud se non ci sono modifiche locali in attesa. Il pulsante **Sincronizza** salva prima le modifiche in attesa, poi aggiorna pagine e ricordi. Mostra caricamento, conferma ed eventuali errori di rete o sessione scaduta. In caso di errore puoi riprovare dal pulsante; le bozze restano nel browser. Non c’è polling continuo, per evitare di mantenere attivo il database gratuito inutilmente.
 
-In caso di conflitto, il salvataggio si ferma e conserva la bozza nel browser. **Esporta bozza e ricarica** scarica una copia della bozza prima di recuperare la versione cloud; puoi poi importarla e unire i contenuti. Non è un sistema di editing collaborativo simultaneo.
+In caso di conflitto sullo stesso elemento, il salvataggio si ferma e conserva la bozza nel browser. **Esporta bozza e ricarica** scarica una copia della bozza prima di recuperare la versione cloud; puoi poi importarla e unire i contenuti. Le bozze nuove registrano anche la versione di partenza e possono essere unite automaticamente a modifiche remote di altre pagine dopo un riavvio. Le vecchie bozze prive di questa base restano protette dal controllo conservativo della revisione globale. Non è un sistema di editing collaborativo simultaneo.
 
 ## Sicurezza e gestione
 
@@ -154,7 +185,10 @@ L’icona di CosmoMemo è un SVG originale in `public/icons/cosmomemo.svg`. Il t
 - `hooks/use-cloud-workspace.ts`: bozza locale, salvataggio con revisioni e recupero cloud.
 - `components/cloud-panel.tsx`: memoria e gestione dei collegamenti.
 - `lib/cloud`: database, sicurezza, OAuth e strumenti MCP.
+- `lib/markdown.ts`, `lib/page-content.ts`: conversione Markdown, sezioni, contesto e ricerca.
+- `lib/workspace-changes.ts`: differenze per elemento e unione delle modifiche locali con la risposta cloud.
 - `db/schema.sql`: schema PostgreSQL idempotente.
+- `db/migrations`: funzione atomica di scrittura per pagina/attività e relativi permessi.
 - `tests/cloud.test.ts`: test di persistenza, conflitti, OAuth e protocollo MCP.
 - [RICERCA.md](RICERCA.md): ricerca originale, riferita alla prima versione.
 - [VERIFICHE.md](VERIFICHE.md): controlli e limiti di verifica.

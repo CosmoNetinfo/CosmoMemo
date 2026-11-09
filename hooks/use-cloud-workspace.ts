@@ -1,6 +1,7 @@
 "use client";
 import {useCallback,useEffect,useRef,useState,type SetStateAction} from 'react';
 import {initial,valid,type Workspace} from '@/lib/workspace';
+import {hasEntityConflict,rebaseWorkspace,workspaceChanges} from '@/lib/workspace-changes';
 
 type Mode='loading'|'local'|'locked'|'cloud'|'unavailable';
 const LOCAL='spazio.workspace.v1',DRAFT='cosmomemo.cloud-draft.v1';
@@ -11,6 +12,7 @@ export function useCloudWorkspace(){
  const [message,setMessage]=useState(''),[error,setError]=useState(false),[conflict,setConflict]=useState(false),[pending,setPending]=useState(false);
  const [syncing,setSyncing]=useState(false),[syncMessage,setSyncMessage]=useState(''),[syncError,setSyncError]=useState(false),[needsLogin,setNeedsLogin]=useState(false),[refreshToken,setRefreshToken]=useState(0);
  const latest=useRef(data),revision=useRef(0),dirty=useRef(false),conflicted=useRef(false),mounted=useRef(false);
+ const base=useRef<Workspace|null>(null);
  const saving=useRef<Promise<boolean>|null>(null),syncRequest=useRef<Promise<boolean>|null>(null);
 
  useEffect(()=>{
@@ -29,12 +31,17 @@ export function useCloudWorkspace(){
     const snapshot=await cloud.json();
     if(!valid(snapshot.workspace)||!Number.isSafeInteger(snapshot.revision)||snapshot.revision<0)throw Error('Risposta cloud non valida.');
     if(canceled)return;
-    revision.current=snapshot.revision;let next=snapshot.workspace;
+    revision.current=snapshot.revision;base.current=snapshot.workspace;let next=snapshot.workspace;
     try{
      const saved=localStorage.getItem(DRAFT);
      if(saved){const draft=JSON.parse(saved);if(valid(draft.workspace)&&Number.isSafeInteger(draft.revision)){
-      next=draft.workspace;revision.current=draft.revision;dirty.current=true;setPending(true);
-      if(draft.revision!==snapshot.revision){conflicted.current=true;setConflict(true);setMessage('Una bozza locale e la versione cloud sono diverse. Esporta la bozza prima di ricaricare.');}
+      dirty.current=true;setPending(true);
+      if(valid(draft.base)&&!hasEntityConflict(draft.base,draft.workspace,snapshot.workspace)){
+       next=rebaseWorkspace(draft.base,draft.workspace,snapshot.workspace);
+      }else{
+       next=draft.workspace;revision.current=draft.revision;base.current=valid(draft.base)?draft.base:snapshot.workspace;
+       if(draft.revision!==snapshot.revision){conflicted.current=true;setConflict(true);setMessage('Una bozza locale e la versione cloud modificano lo stesso elemento. Esporta la bozza prima di ricaricare.');}
+      }
      }}
     }catch{}
     latest.current=next;rawSet(next);setMode('cloud');
@@ -59,16 +66,18 @@ export function useCloudWorkspace(){
    try{
     while(dirty.current&&mounted.current){
      const sent=latest.current;
-     const response=await request('/api/workspace',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({workspace:sent,revision:revision.current})});
+     const response=await request('/api/workspace',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({workspace:sent,revision:revision.current,base:base.current})});
      if(response.status===409){conflicted.current=true;setConflict(true);throw Error('Modifiche presenti nel cloud. La tua bozza è conservata: esportala e ricarica prima di unire i contenuti.');}
      if(response.status===401){setNeedsLogin(true);throw Error('Sessione scaduta. Accedi di nuovo per salvare la bozza.');}
      if(!response.ok)throw Error('Cloud non raggiungibile. La bozza resta in questo browser: usa Riprova.');
      const saved=await response.json();
-     if(!Number.isSafeInteger(saved.revision)||saved.revision<=revision.current)throw Error('Risposta cloud non valida. La bozza è conservata.');
+     if(!Number.isSafeInteger(saved.revision)||saved.revision<revision.current||!valid(saved.workspace))throw Error('Risposta cloud non valida. La bozza è conservata.');
      revision.current=saved.revision;
-     dirty.current=latest.current!==sent;
+     const next=latest.current===sent?saved.workspace:rebaseWorkspace(sent,latest.current,saved.workspace);
+     base.current=saved.workspace;latest.current=next;rawSet(next);
+     const unsaved=workspaceChanges(saved.workspace,next);dirty.current=unsaved.pages.length+unsaved.tasks.length>0;
      if(!dirty.current){try{localStorage.removeItem(DRAFT);}catch{}setPending(false);}
-     else localStorage.setItem(DRAFT,JSON.stringify({workspace:latest.current,revision:revision.current}));
+     else localStorage.setItem(DRAFT,JSON.stringify({workspace:latest.current,revision:revision.current,base:base.current}));
      setError(false);setMessage('');setNeedsLogin(false);
     }
     return !dirty.current;
@@ -87,7 +96,7 @@ export function useCloudWorkspace(){
    return;
   }
   if(mode!=='cloud'||!dirty.current)return;
-  try{localStorage.setItem(DRAFT,JSON.stringify({workspace:data,revision:revision.current}));}
+  try{localStorage.setItem(DRAFT,JSON.stringify({workspace:data,revision:revision.current,base:base.current}));}
   catch{setError(true);setMessage('Impossibile conservare la bozza nel browser. Esporta un backup.');}
   if(conflict)return;
   const timer=setTimeout(()=>{void savePending();},800);return()=>clearTimeout(timer);
@@ -112,7 +121,7 @@ export function useCloudWorkspace(){
      if(manual)setSyncMessage('Nuove modifiche in salvataggio. Riprova la sincronizzazione al termine.');return false;
     }
     if(snapshot.revision<revision.current)throw Error('Risposta cloud non aggiornata. I dati locali sono conservati: riprova.');
-    if(snapshot.revision>revision.current){revision.current=snapshot.revision;latest.current=snapshot.workspace;rawSet(snapshot.workspace);}
+    if(snapshot.revision>revision.current){revision.current=snapshot.revision;base.current=snapshot.workspace;latest.current=snapshot.workspace;rawSet(snapshot.workspace);}
     setNeedsLogin(false);setSyncError(false);setRefreshToken(value=>value+1);
     if(manual)setSyncMessage('Sincronizzazione completata.');
     return true;

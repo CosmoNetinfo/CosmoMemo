@@ -1,24 +1,50 @@
 import { neon } from '@neondatabase/serverless';
 import { initial, valid, type Workspace } from '../workspace';
+import {normalizeWorkspace,workspaceChanges,type WorkspaceChanges} from '../workspace-changes';
 
 export type Row = Record<string, unknown>;
 export type Query = (text: string, values?: unknown[]) => Promise<Row[]>;
 export type Snapshot = { workspace: Workspace; revision: number };
 export type Memory = { key: string; content: string; tags: string[]; revision: number; updatedAt: number };
-export class Conflict extends Error { constructor(){super('Contenuto aggiornato altrove. Ricarica la versione più recente prima di riprovare.');} }
+export class Conflict extends Error {
+ constructor(readonly detail?:{entity_id?:string;collection?:string;expected_revision?:number;current_revision?:number}){super('Questo elemento è stato aggiornato altrove. Rileggi la sua revisione prima di riprovare.');}
+}
 export class InputError extends Error {}
 export class Store {
   constructor(readonly query: Query){}
   async snapshot(): Promise<Snapshot> {
     await this.query('INSERT INTO cm_workspace(id, document, updated_at) VALUES(1,$1::jsonb,$2) ON CONFLICT DO NOTHING',[JSON.stringify(initial),Date.now()]);
     const [row] = await this.query('SELECT document, revision FROM cm_workspace WHERE id=1');
-    return {workspace:row.document as Workspace,revision:Number(row.revision)};
+    return {workspace:normalizeWorkspace(row.document as Workspace),revision:Number(row.revision)};
   }
-  async save(workspace: Workspace, revision: number): Promise<Snapshot> {
+  async save(workspace: Workspace, revision: number, base?:Workspace): Promise<Snapshot> {
     if(!valid(workspace)||JSON.stringify(workspace).length>2_000_000)throw new InputError('Workspace non valido o troppo grande (massimo 2 MB).');
-    const rows=await this.query('UPDATE cm_workspace SET document=$1::jsonb, revision=revision+1, updated_at=$2 WHERE id=1 AND revision=$3 RETURNING revision',[JSON.stringify(workspace),Date.now(),revision]);
-    if(!rows.length)throw new Conflict();
-    return {workspace,revision:Number(rows[0].revision)};
+    if(base&&!valid(base))throw new InputError('Versione di partenza non valida.');
+    const current=await this.snapshot();
+    if(!base&&current.revision!==revision)throw new Conflict({entity_id:'workspace',expected_revision:revision,current_revision:current.revision});
+    return this.apply(workspaceChanges(base||current.workspace,workspace),base?undefined:revision);
+  }
+  async apply(changes:WorkspaceChanges,legacyRevision?:number):Promise<Snapshot>{
+    const current=await this.snapshot();
+    const projected:Workspace=structuredClone(current.workspace);
+    for(const collection of ['pages','tasks'] as const){
+      const ids=new Set<string>();
+      for(const change of changes[collection]){
+        if(ids.has(change.id)||!Number.isSafeInteger(change.expected_revision)||change.expected_revision<0)throw new InputError('Modifiche non valide.');ids.add(change.id);
+        const items=projected[collection] as {id:string}[],index=items.findIndex(item=>item.id===change.id);
+        if(!change.document){if(index>=0)items.splice(index,1);}else if(index<0)items.push(change.document);else items[index]=change.document;
+      }
+    }
+    if(!valid(projected))throw new InputError('Gerarchia o contenuto non validi.');
+    try{
+      const [row]=await this.query('SELECT cm_apply_changes($1::jsonb,$2::integer) AS snapshot',[JSON.stringify(changes),legacyRevision??null]);
+      const result=row.snapshot as Snapshot;return {...result,workspace:normalizeWorkspace(result.workspace)};
+    }catch(error){
+      const e=error as {message?:string;detail?:string};
+      if(e.message?.startsWith('CM_CONFLICT')){let detail;try{detail=JSON.parse(e.detail||'{}');}catch{}throw new Conflict(detail);}
+      if(e.message?.startsWith('CM_INVALID'))throw new InputError('Modifica non valida: controlla dimensioni, gerarchia e pagine nel cestino.');
+      throw error;
+    }
   }
   async memories(query='',limit=100): Promise<Memory[]> {
     const rows=await this.query("SELECT * FROM cm_memories WHERE strpos(lower(key || ' ' || content || ' ' || tags::text),lower($1))>0 ORDER BY updated_at DESC,key LIMIT $2",[query,Math.min(100,Math.max(1,limit))]);

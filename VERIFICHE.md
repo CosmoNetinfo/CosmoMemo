@@ -1,5 +1,14 @@
 # Verifiche — 8 novembre 2026
 
+## Versione 3.0 — flussi Claude, Markdown e revisioni per pagina
+
+- Import/export Markdown con titoli H1–H6, liste puntate e numerate, checkbox annidate, citazioni e codice con linguaggio; verificata la riesportazione di codice contenente backtick. HTML conservato come testo e tabelle come codice Markdown con avvisi.
+- Test SQL con PostgreSQL embedded: due pagine aggiornate in parallelo dalla stessa base, conservazione di modifiche remote a pagine/attività diverse, conflitto sulla medesima pagina senza salvataggi parziali, compatibilità del vecchio salvataggio globale e controllo di cicli tra spostamenti concorrenti.
+- Test con SDK MCP: importazione del brief, lettura e aggiunta alla sezione, aggiornamento di una checkbox senza modificare gli altri blocchi, ricerca con riferimenti, contesto con limiti di autorizzazione, spostamento e ripristino.
+- Verificato il rifiuto delle chiamate che usano il vecchio parametro di revisione sulle nuove scritture per pagina.
+- Test browser con server simulato: import/export del file MD, preservazione di una pagina modificata da Claude mentre si salva un’altra dal browser, recupero della bozza dopo il riavvio e tutti i precedenti casi di sincronizzazione.
+- Quattordici gruppi di test Node e dodici test browser superati nell’ambiente locale; i test non leggono né modificano i documenti personali nel database cloud.
+
 ## Icona web app — 9 novembre 2026
 
 - Nuovo simbolo vettoriale originale, con taccuino, segnalibro e stella, verificato visivamente a 256, 128, 64, 32 e 16 pixel.
