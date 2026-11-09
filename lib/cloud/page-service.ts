@@ -21,7 +21,7 @@ export async function updatePage(db:Store,id:string,expected:number,change:(page
  const saved=await db.apply({pages:[{id,expected_revision:expected,document:change(structuredClone(page),snapshot.workspace)}],tasks:[]});
  return pageResult(saved,id);
 }
-export async function createPage(db:Store,content:Pick<Page,'title'|'icon'|'blocks'>,parent:string|null=null){
+export async function createPage(db:Store,content:Pick<Page,'title'|'icon'|'blocks'|'kind'|'status'>,parent:string|null=null){
  if(parent){const {page}=await readPage(db,parent);if(page.deleted)throw new InputError('Pagina genitore nel cestino.');}
  const page:Page={...content,id:randomUUID(),parent,favorite:false,deleted:false,updated:Date.now()};
  const saved=await db.apply({pages:[{id:page.id,expected_revision:0,document:page}],tasks:[]});

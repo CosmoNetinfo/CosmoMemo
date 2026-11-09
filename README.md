@@ -15,6 +15,7 @@ Pagine, progetti e **memoria persistente per Claude**, con Next.js e PostgreSQL 
 - Backup JSON delle pagine, esportazione Markdown ed esportazione separata dei ricordi.
 - Importazione Markdown in blocchi anche tramite Claude, modifica di sezioni e singoli blocchi, ricerca nel contenuto con estratti.
 - Revisioni individuali per pagine e attività, con unione delle modifiche indipendenti tra app e Claude.
+- Tipo e stato delle pagine, attività collegate ai progetti, cronologia con autore e ripristino di versioni, riepilogo delle novità dall’ultima lettura.
 
 Questa versione offre **un solo account proprietario per installazione**. Non è un servizio multiutente. I visitatori senza accesso possono usare solo le pagine locali nel proprio browser; non possono leggere il tuo archivio cloud.
 
@@ -43,13 +44,13 @@ Puoi chiedere, ad esempio:
 
 La memoria **resta nel database tra conversazioni e riavvii** fino a quando la elimini. Non modifica la memoria interna di Claude e non carica automaticamente tutte le chat. Claude deve richiamare gli strumenti del connettore nelle nuove conversazioni: le istruzioni del server e il prompt `riprendi_contesto` favoriscono questo flusso, senza garantirne l’esecuzione automatica da parte del modello.
 
-Controlla i ricordi da **Memoria di Claude**. Puoi correggerli, eliminarli o esportarli. Non usarli per password e token. La cancellazione dall’app elimina la voce dal database attivo; eventuali copie nei backup del provider seguono la sua conservazione.
+Controlla i ricordi da **Memoria di Claude**. Puoi correggerli, eliminarli o esportarli. Non usarli per password e token. La cancellazione elimina la voce dalla memoria attiva e dalla ricerca. Dalla versione 3.1 la cronologia conserva anche i valori precedenti dei ricordi modificati o eliminati, nel database privato; eventuali copie nei backup del provider seguono la sua conservazione.
 
 ### Strumenti MCP
 
 | Strumento | Funzione |
 | --- | --- |
-| `get_context` | Albero delle pagine, ricordi recenti autorizzati e attività aperte in una chiamata |
+| `get_context` | Albero, ricordi recenti autorizzati, attività aperte e novità in una chiamata |
 | `list_pages` | Cerca ed elenca le pagine |
 | `read_page` | Legge contenuto e revisione individuale della pagina |
 | `search_pages` | Cerca nel testo delle pagine con estratti, sezione e ID dei blocchi |
@@ -66,11 +67,30 @@ Controlla i ricordi da **Memoria di Claude**. Puoi correggerli, eliminarli o esp
 | `list_tasks` | Legge le attività |
 | `save_task` | Crea o aggiorna un’attività |
 | `delete_task` | Elimina una singola attività con controllo della revisione |
+| `list_page_history` | Elenca salvataggi, autore e campi modificati di una pagina |
+| `read_page_version` | Legge il contenuto prima o dopo un salvataggio |
+| `restore_page_version` | Ripristina una versione storica creando un nuovo salvataggio |
+| `get_changes` | Restituisce le novità dall’ultimo punto di lettura del connettore |
+| `mark_changes_seen` | Registra il cursore effettivamente letto e riassunto |
 | `search_memories` | Recupera i ricordi pertinenti |
 | `remember` | Crea o aggiorna un ricordo |
 | `forget` | Elimina un ricordo |
 
 I permessi OAuth distinguono lettura e scrittura di pagine e memoria. Gli strumenti non autorizzati non vengono esposti. Dalle impostazioni di CosmoMemo puoi revocare un collegamento; i relativi token vengono invalidati anche se Claude li conserva.
+
+### Progetti, cronologia e novità nella versione 3.1
+
+Ogni pagina può avere `kind`: `note` (Appunto), `idea` (Idea), `project` (Progetto); e `status`: `draft` (Bozza), `active` (In corso), `done` (Completato), `archived` (Archiviato). Le pagine precedenti senza questi campi sono mostrate come Appunto/Bozza. Modificali nelle proprietà della pagina, oppure con `create_page`, `create_page_from_markdown` e `update_page`. `list_pages` accetta filtri `kind` e `status`.
+
+`save_task(project_id: ID)` collega un’attività a una pagina di tipo Progetto; `project_id: null` scollega e l’omissione conserva il collegamento esistente. `list_tasks(project_id: ID)` filtra le attività. Nell’app la tabella e la bacheca permettono il collegamento e la pagina del progetto mostra le sue attività. Prima di cambiare il tipo di un progetto occorre scollegare le attività. Il cestino conserva i collegamenti; le attività collegate a un progetto nel cestino devono essere scollegate prima di modificarle. I backup JSON conservano i collegamenti e l’importazione rimappa gli identificatori.
+
+Dal menu della pagina apri **Cronologia pagina**. Ogni salvataggio cloud registra il contenuto prima e dopo, data, campi modificati e autore assegnato dal server: **Tu** per l’app, **Claude** con ID del client OAuth per il connettore. L’autore indica il canale autenticato che ha scritto, non verifica chi ha formulato materialmente il testo. La registrazione è atomica con la scrittura; errori e conflitti non generano versioni parziali. La cronologia comincia con questa migrazione: la prima modifica a una pagina esistente conserva anche il contenuto precedente. Non ricostruisce i salvataggi già avvenuti. Le modifiche soltanto locali non vengono registrate nella cronologia cloud.
+
+Seleziona **Prima della modifica** o **Dopo la modifica**, controlla l’anteprima e conferma il ripristino. Con Claude usa `list_page_history`, `read_page_version` e `restore_page_version(page_id,event_id,side,expected_page_revision)`. Il ripristino conserva l’identificatore della pagina, avanza la sua revisione e crea un nuovo evento, mantenendo le versioni già registrate. Un genitore non più disponibile viene sostituito dal livello principale; gerarchie cicliche e collegamenti alle attività non validi vengono rifiutati.
+
+**Cosa è cambiato** elenca pagine, attività e ricordi modificati dalla tua ultima lettura. Non azzera le novità quando apri la schermata: usa **Segna queste modifiche come lette** dopo averle consultate. Per Claude, `get_context` comprende anche `changes`; con `get_changes` puoi continuare usando `since_cursor: next_cursor` finché `has_more` è falso. Solo dopo aver letto e riassunto gli eventi richiama `mark_changes_seen(cursor: next_cursor)`. Il punto di lettura è persistente, separato tra app e ciascun client OAuth, e condiviso tra le conversazioni dello stesso connettore. Un cursore già avanzato non torna indietro. Il feed espone riepiloghi e campi cambiati, non copie complete dei documenti; i ricordi vengono omessi se manca `memory:read`.
+
+I 25 strumenti richiedono di aggiornare o ricollegare il connettore per ricaricare gli schemi. Non servono nuove variabili d’ambiente. Prima del deploy esegui `npm run db:migrate` sul database corretto: aggiunge tabelle, trigger e funzioni senza sostituire i contenuti. Le scritture di una vecchia versione del server durante il passaggio sono etichettate **Client precedente**, senza attribuirle a te o a Claude. La cronologia resta nel database e cresce con i salvataggi; il backup JSON dell’app include lo stato corrente di pagine e attività, non la cronologia né i punti di lettura. Per trasferire anche quelli usa un backup PostgreSQL completo.
 
 Il permesso `pages:write` include la cancellazione: `delete_page` usa il cestino, con ripristino dall’app, mentre `delete_task` elimina definitivamente l’attività. Le sottopagine dirette della pagina eliminata restano disponibili al livello principale. La memoria viene eliminata con `forget`, nel permesso `memory:write`. Tutte queste operazioni richiedono una revisione recente e sono dichiarate distruttive nei metadati MCP. Dopo un aggiornamento, se Claude mostra ancora l’elenco precedente, aggiorna o ricollega il connettore per ricaricare gli strumenti.
 
@@ -173,7 +193,7 @@ In caso di conflitto sullo stesso elemento, il salvataggio si ferma e conserva l
 
 L’operatore può ripristinare la password con `npm run owner:reset` dal proprio ambiente server configurato. Il comando invalida le sessioni e tutti i collegamenti Claude. Il codice di prima attivazione non è un meccanismo di recupero per un account già attivato.
 
-Non è stato eseguito un audit indipendente di sicurezza. La prima versione resta limitata a uso personale: niente allegati, formule, relazioni, database personalizzabili o sincronizzazione collaborativa in tempo reale.
+Non è stato eseguito un audit indipendente di sicurezza. L’app resta limitata a uso personale: niente allegati, formule, relazioni personalizzabili tra database o sincronizzazione collaborativa in tempo reale.
 
 ## Struttura
 
@@ -184,11 +204,13 @@ L’icona di CosmoMemo è un SVG originale in `public/icons/cosmomemo.svg`. Il t
 - `app/api`: API protette per pagine, ricordi e collegamenti.
 - `hooks/use-cloud-workspace.ts`: bozza locale, salvataggio con revisioni e recupero cloud.
 - `components/cloud-panel.tsx`: memoria e gestione dei collegamenti.
+- `components/page-properties.tsx`, `components/activity-panel.tsx`: proprietà, attività collegate, cronologia e novità.
+- `lib/cloud/history.ts`, `app/api/history`, `app/api/changes`: versioni e punti di lettura autenticati.
 - `lib/cloud`: database, sicurezza, OAuth e strumenti MCP.
 - `lib/markdown.ts`, `lib/page-content.ts`: conversione Markdown, sezioni, contesto e ricerca.
 - `lib/workspace-changes.ts`: differenze per elemento e unione delle modifiche locali con la risposta cloud.
 - `db/schema.sql`: schema PostgreSQL idempotente.
-- `db/migrations`: funzione atomica di scrittura per pagina/attività e relativi permessi.
+- `db/migrations`: scritture per elemento, cronologia atomica, integrità dei progetti e relativi permessi.
 - `tests/cloud.test.ts`: test di persistenza, conflitti, OAuth e protocollo MCP.
 - [RICERCA.md](RICERCA.md): ricerca originale, riferita alla prima versione.
 - [VERIFICHE.md](VERIFICHE.md): controlli e limiti di verifica.

@@ -14,7 +14,7 @@ export function pageTree(pages:Page[],limit=300){
  const active=pages.filter(page=>!page.deleted),available=new Set(active.map(page=>page.id));
  let count=0;
  function children(parent:string|null):unknown[]{return active.filter(page=>(page.parent&&available.has(page.parent)?page.parent:null)===parent).flatMap(page=>{
-  if(count>=limit)return [];count++;return [{id:page.id,title:page.title,icon:page.icon,revision:page.revision||1,parent:page.parent,children:children(page.id)}];
+  if(count>=limit)return [];count++;return [{id:page.id,title:page.title,icon:page.icon,kind:page.kind||'note',status:page.status||'draft',revision:page.revision||1,parent:page.parent,children:children(page.id)}];
  });}
  return {pages:children(null),total:active.length,returned:Math.min(active.length,count),truncated:count<active.length};
 }

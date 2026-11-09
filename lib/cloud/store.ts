@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { initial, valid, type Workspace } from '../workspace';
 import {normalizeWorkspace,workspaceChanges,type WorkspaceChanges} from '../workspace-changes';
+import type {Actor} from '../activity';
 
 export type Row = Record<string, unknown>;
 export type Query = (text: string, values?: unknown[]) => Promise<Row[]>;
@@ -11,7 +12,8 @@ export class Conflict extends Error {
 }
 export class InputError extends Error {}
 export class Store {
-  constructor(readonly query: Query){}
+  constructor(readonly query: Query,readonly actor:Actor={kind:'owner',id:'owner',name:'Tu'}){}
+  asActor(actor:Actor){return new Store(this.query,actor);}
   async snapshot(): Promise<Snapshot> {
     await this.query('INSERT INTO cm_workspace(id, document, updated_at) VALUES(1,$1::jsonb,$2) ON CONFLICT DO NOTHING',[JSON.stringify(initial),Date.now()]);
     const [row] = await this.query('SELECT document, revision FROM cm_workspace WHERE id=1');
@@ -37,7 +39,7 @@ export class Store {
     }
     if(!valid(projected))throw new InputError('Gerarchia o contenuto non validi.');
     try{
-      const [row]=await this.query('SELECT cm_apply_changes($1::jsonb,$2::integer) AS snapshot',[JSON.stringify(changes),legacyRevision??null]);
+      const [row]=await this.query('SELECT cm_apply_changes_audited($1::jsonb,$2::integer,$3::jsonb) AS snapshot',[JSON.stringify(changes),legacyRevision??null,JSON.stringify(this.actor)]);
       const result=row.snapshot as Snapshot;return {...result,workspace:normalizeWorkspace(result.workspace)};
     }catch(error){
       const e=error as {message?:string;detail?:string};
@@ -52,17 +54,16 @@ export class Store {
   }
   async remember(key: string, content: string, tags: string[], revision: number): Promise<Memory> {
     if(!/^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,119}$/.test(key)||!content.trim()||content.length>50_000||tags.length>15||tags.some(t=>typeof t!=='string'||t.length>80))throw new InputError('Chiave, contenuto o tag non validi.');
-    const now=Date.now();
-    const rows=revision===0
-      ?await this.query('INSERT INTO cm_memories(key,content,tags,updated_at) VALUES($1,$2,$3::jsonb,$4) ON CONFLICT DO NOTHING RETURNING revision',[key,content,JSON.stringify(tags),now])
-      :await this.query('UPDATE cm_memories SET content=$2,tags=$3::jsonb,updated_at=$4,revision=revision+1 WHERE key=$1 AND revision=$5 RETURNING revision',[key,content,JSON.stringify(tags),now,revision]);
-    if(!rows.length)throw new Conflict();
-    return {key,content,tags,revision:Number(rows[0].revision),updatedAt:now};
+    const stored=await this.writeMemory(key,content,tags,revision,false);
+    return {key,content,tags,revision:Number(stored.revision),updatedAt:Number(stored.updated_at)};
   }
   async forget(key: string, revision: number) {
-    const rows=await this.query('DELETE FROM cm_memories WHERE key=$1 AND revision=$2 RETURNING key',[key,revision]);
-    if(!rows.length)throw new Conflict();
+    await this.writeMemory(key,'',[],revision,true);
     return {deleted:true,key};
+  }
+  private async writeMemory(key:string,content:string,tags:string[],revision:number,remove:boolean){
+    try{const [row]=await this.query('SELECT cm_write_memory($1,$2,$3::jsonb,$4,$5,$6::jsonb) AS memory',[key,content,JSON.stringify(tags),revision,remove,JSON.stringify(this.actor)]);return row.memory as Row;}
+    catch(e){if((e as Error).message?.startsWith('CM_CONFLICT'))throw new Conflict();throw e;}
   }
   async exportMemories(after='') {
     const rows=await this.query('SELECT * FROM cm_memories WHERE key>$1 ORDER BY key LIMIT 40',[after]);

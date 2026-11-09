@@ -1,6 +1,8 @@
 export type Block={id:string;type:string;text:string;checked?:boolean;language?:string;indent?:number;number?:number};
-export type Page={id:string;title:string;icon:string;parent:string|null;favorite:boolean;deleted:boolean;updated:number;blocks:Block[];revision?:number};
-export type Task={id:string;title:string;status:string;priority:string;date:string;tag:string;revision?:number};
+export const pageKinds={note:'Appunto',idea:'Idea',project:'Progetto'} as const;
+export const pageStatuses={draft:'Bozza',active:'In corso',done:'Completato',archived:'Archiviato'} as const;
+export type Page={id:string;title:string;icon:string;parent:string|null;favorite:boolean;deleted:boolean;updated:number;blocks:Block[];revision?:number;kind?:keyof typeof pageKinds;status?:keyof typeof pageStatuses};
+export type Task={id:string;title:string;status:string;priority:string;date:string;tag:string;revision?:number;project_id?:string|null};
 export type Workspace={version:1;pages:Page[];tasks:Task[]};
 export const uid=()=>globalThis.crypto.randomUUID();
 export const types=[['text','Aa','Testo'],['h1','H₁','Titolo grande'],['h2','H₂','Titolo medio'],['h3','H₃','Titolo piccolo'],['h4','H₄','Titolo 4'],['h5','H₅','Titolo 5'],['h6','H₆','Titolo 6'],['numbered','1.','Elenco numerato'],['todo','☑','Lista di attività'],['bullet','•','Elenco puntato'],['quote','❞','Citazione'],['callout','☀','In evidenza'],['code','</>','Codice'],['divider','—','Divisore']];
@@ -19,11 +21,12 @@ export function valid(value:unknown):value is Workspace {
  const pages=new Map<string,Page>();
  for(const p of d.pages){
   if(!p||typeof p.id!=='string'||pages.has(p.id)||typeof p.title!=='string'||typeof p.icon!=='string'||(p.parent!==null&&typeof p.parent!=='string')||typeof p.favorite!=='boolean'||typeof p.deleted!=='boolean'||!Number.isFinite(p.updated)||!Array.isArray(p.blocks)||!revisionValid(p.revision))return false;
+  if((p.kind!==undefined&&!Object.hasOwn(pageKinds,p.kind))||(p.status!==undefined&&!Object.hasOwn(pageStatuses,p.status)))return false;
   pages.set(p.id,p);const ids=new Set<string>();
   for(const b of p.blocks){if(!b||typeof b.id!=='string'||ids.has(b.id)||!types.some(t=>t[0]===b.type)||typeof b.text!=='string'||(b.checked!==undefined&&typeof b.checked!=='boolean')||(b.language!==undefined&&(typeof b.language!=='string'||b.language.length>80||/[\r\n`~]/.test(b.language)))||(b.indent!==undefined&&(!Number.isInteger(b.indent)||b.indent<0||b.indent>12))||(b.number!==undefined&&(!Number.isInteger(b.number)||b.number<1)))return false;ids.add(b.id);}
  }
  for(const p of d.pages){const seen=new Set([p.id]);let parent=p.parent;while(parent){if(seen.has(parent)||!pages.has(parent))return false;seen.add(parent);parent=pages.get(parent)!.parent;}}
  const ids=new Set<string>();
- return d.tasks.every(t=>{if(!t||typeof t.id!=='string'||ids.has(t.id)||![t.title,t.tag,t.date].every(x=>typeof x==='string')||!['Da iniziare','In corso','Completato'].includes(t.status)||!['Alta','Media','Bassa'].includes(t.priority)||!revisionValid(t.revision))return false;ids.add(t.id);return true;});
+ return d.tasks.every(t=>{if(!t||typeof t.id!=='string'||ids.has(t.id)||![t.title,t.tag,t.date].every(x=>typeof x==='string')||!['Da iniziare','In corso','Completato'].includes(t.status)||!['Alta','Media','Bassa'].includes(t.priority)||!revisionValid(t.revision))return false;if(t.project_id!==undefined&&t.project_id!==null&&(typeof t.project_id!=='string'||pages.get(t.project_id)?.kind!=='project'))return false;ids.add(t.id);return true;});
 }
 export {pageToMarkdown as markdown} from './markdown';

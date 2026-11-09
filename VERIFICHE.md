@@ -1,5 +1,12 @@
 # Verifiche — 8 novembre 2026
 
+## Versione 3.1 — progetti, cronologia e novità · 9 novembre 2026
+
+- Diciotto gruppi di test applicativi con PostgreSQL embedded e SDK MCP: proprietà delle pagine, attività collegate, integrità dei progetti anche nel controllo SQL finale, cronologia atomica, autori assegnati dal server, ripristino delle versioni precedenti, rifiuto di revisioni obsolete e assenza di eventi per operazioni fallite.
+- Verificati paginazione delle novità, filtri sui permessi memoria, punti di lettura separati e persistenti, cursori monotoni e migrazioni idempotenti che conservano gli eventi.
+- Sedici test browser con API simulate sulla build locale di produzione: nuovi controlli tipo/stato e progetti, cronologia con autore e anteprima prima della modifica, ripristino confermato, novità paginate con conferma di lettura, importazione backup con rimappatura dei collegamenti, oltre ai precedenti test Markdown e sincronizzazione.
+- Build, TypeScript e controllo di assenza delle credenziali server nel bundle pubblico completati. I test non leggono né modificano le pagine personali in Neon.
+
 ## Versione 3.0 — flussi Claude, Markdown e revisioni per pagina
 
 - Import/export Markdown con titoli H1–H6, liste puntate e numerate, checkbox annidate, citazioni e codice con linguaggio; verificata la riesportazione di codice contenente backtick. HTML conservato come testo e tabelle come codice Markdown con avvisi.

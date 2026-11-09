@@ -15,7 +15,7 @@ async function handle(request:Request){
   const grant=bearer?await accessGrant(bearer):null;
   if(!grant)return noStore({error:'invalid_token'},401,{'WWW-Authenticate':`Bearer resource_metadata="${appOrigin()}/.well-known/oauth-protected-resource/mcp"`});
   if(request.method==='GET'||request.method==='DELETE')return new Response(null,{status:405,headers:{Allow:'POST','Cache-Control':'no-store'}});
-  const server=createMcpServer(store(),String(grant.scope).split(' '));
+  const server=createMcpServer(store(),String(grant.scope).split(' '),String(grant.client_id));
   const transport=new WebStandardStreamableHTTPServerTransport({sessionIdGenerator:undefined,enableJsonResponse:true,maxRequestBodySize:1_000_000});
   await server.connect(transport);
   try{const response=await transport.handleRequest(request);response.headers.set('Cache-Control','no-store');return response;}finally{await server.close();}
