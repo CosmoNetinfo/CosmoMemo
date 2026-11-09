@@ -128,7 +128,7 @@ Per trasferire le pagine dal vecchio indirizzo Sites, esporta prima il backup JS
 
 ### Modifiche contemporanee e interruzioni
 
-Quando torni nella scheda, l’app recupera gli aggiornamenti cloud se non ci sono modifiche locali in attesa. È disponibile anche il pulsante **Sincronizza**. Non c’è polling continuo, per evitare di mantenere attivo il database gratuito inutilmente.
+Quando torni nella scheda, l’app recupera gli aggiornamenti cloud se non ci sono modifiche locali in attesa. Il pulsante **Sincronizza** salva prima le modifiche in attesa, poi aggiorna pagine e ricordi. Mostra caricamento, conferma ed eventuali errori di rete o sessione scaduta. In caso di errore puoi riprovare dal pulsante; le bozze restano nel browser. Non c’è polling continuo, per evitare di mantenere attivo il database gratuito inutilmente.
 
 In caso di conflitto, il salvataggio si ferma e conserva la bozza nel browser. **Esporta bozza e ricarica** scarica una copia della bozza prima di recuperare la versione cloud; puoi poi importarla e unire i contenuti. Non è un sistema di editing collaborativo simultaneo.
 
@@ -157,4 +157,4 @@ Non è stato eseguito un audit indipendente di sicurezza. La prima versione rest
 - [RICERCA.md](RICERCA.md): ricerca originale, riferita alla prima versione.
 - [VERIFICHE.md](VERIFICHE.md): controlli e limiti di verifica.
 
-GitHub Actions esegue test, build e TypeScript a ogni push e pull request. Il progetto non è affiliato a Notion o Anthropic. Le dipendenze mantengono le rispettive licenze.
+GitHub Actions esegue test, build, TypeScript e test browser della sincronizzazione a ogni push e pull request. Per eseguire i test browser localmente, installa Chromium con `npx playwright install chromium`, compila con `npm run build` ed esegui `npm run test:browser`. I test browser usano risposte cloud simulate e non toccano il database personale. Il progetto non è affiliato a Notion o Anthropic. Le dipendenze mantengono le rispettive licenze.

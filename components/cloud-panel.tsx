@@ -1,11 +1,12 @@
 "use client";
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {Brain,Plus,RefreshCw,Trash2,Pencil,Download,Link2,LogOut,ArrowUpRight} from 'lucide-react';
 import type {Memory} from '@/lib/cloud/store';
-export function MemoryPanel({connected}:{connected:boolean}){
+export function MemoryPanel({connected,refreshToken=0}:{connected:boolean;refreshToken?:number}){
  const [items,setItems]=useState<Memory[]>([]),[query,setQuery]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(false),[editing,setEditing]=useState<Memory|null>(null),[key,setKey]=useState(''),[content,setContent]=useState(''),[tags,setTags]=useState(''),[saving,setSaving]=useState(false),[deleting,setDeleting]=useState('');
- async function load(search=query){setLoading(true);try{const response=await fetch('/api/memories?q='+encodeURIComponent(search),{cache:'no-store'});const body=await response.json();if(!response.ok)throw Error(body.error);setItems(body.memories);setError('');}catch(e){setError(e instanceof Error?e.message:'Memoria non disponibile.');}finally{setLoading(false);}}
- useEffect(()=>{if(connected)void load('');},[connected]);
+ const loadSequence=useRef(0);
+ async function load(search=query){const sequence=++loadSequence.current;setLoading(true);try{const response=await fetch('/api/memories?q='+encodeURIComponent(search),{cache:'no-store',signal:AbortSignal.timeout(15000)});const body=await response.json();if(!response.ok)throw Error(body.error);if(sequence===loadSequence.current){setItems(body.memories);setError('');}}catch(e){if(sequence===loadSequence.current)setError(e instanceof Error?e.message:'Memoria non disponibile.');}finally{if(sequence===loadSequence.current)setLoading(false);}}
+ useEffect(()=>{if(connected)void load(query);return()=>{loadSequence.current+=1;};},[connected,refreshToken]);
  function edit(memory?:Memory){setEditing(memory||{key:'',content:'',tags:[],revision:0,updatedAt:0});setKey(memory?.key||'');setContent(memory?.content||'');setTags(memory?.tags.join(', ')||'');}
  async function save(){if(!editing)return;setSaving(true);try{const response=await fetch('/api/memories',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,content,tags:tags.split(',').map(x=>x.trim()).filter(Boolean),revision:editing.revision})});const body=await response.json();if(!response.ok)throw Error(body.error);setEditing(null);await load();}catch(e){setError(e instanceof Error?e.message:'Salvataggio non riuscito.');}finally{setSaving(false);}}
  async function forget(memory:Memory){try{const response=await fetch('/api/memories',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:memory.key,revision:memory.revision})});const body=await response.json();if(!response.ok)throw Error(body.error);setDeleting('');await load();}catch(e){setError(e instanceof Error?e.message:'Eliminazione non riuscita.');}}

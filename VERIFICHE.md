@@ -1,5 +1,13 @@
 # Verifiche — 8 novembre 2026
 
+## Versione 2.1.1 — pulsante Sincronizza, 9 novembre 2026
+
+- Nove test browser sulla build di produzione: aggiornamento di pagine ed editor, conferma senza nuove versioni, aggiornamento dei ricordi a revisione workspace invariata, salvataggio delle modifiche pendenti prima della lettura, errori 503 e sessione 401, stato di caricamento e risposta lenta, pagina eliminata da remoto, salvataggio fallito e conflitto concorrente.
+- Le richieste dei test sono intercettate con risposte simulate: il database e l’account dell’utente non vengono modificati.
+- Le operazioni automatiche e manuali condividono il salvataggio in corso; una risposta lenta non sostituisce modifiche locali più recenti. Errori e sessioni scadute sono visibili e le bozze vengono conservate.
+- Ripetuti con successo i sei gruppi di test MCP/database, il controllo TypeScript, la build e il controllo del bundle pubblico per le credenziali server.
+- Aggiunti i test browser a GitHub Actions.
+
 ## Versione 2.1 — cancellazione tramite Claude, 9 novembre 2026
 
 - Aggiunti gli strumenti MCP `delete_page` e `delete_task`, entrambi nel permesso `pages:write` e dichiarati distruttivi.
