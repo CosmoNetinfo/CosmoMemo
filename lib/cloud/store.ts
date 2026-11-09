@@ -11,6 +11,11 @@ export class Conflict extends Error {
  constructor(readonly detail?:{entity_id?:string;collection?:string;expected_revision?:number;current_revision?:number}){super('Questo elemento è stato aggiornato altrove. Rileggi la sua revisione prima di riprovare.');}
 }
 export class InputError extends Error {}
+export function validateTaskProject(workspace:Workspace,projectId:string|null|undefined){
+ if(projectId===undefined||projectId===null)return;
+ const project=workspace.pages.find(p=>p.id===projectId);
+ if(!project||project.deleted||project.kind!=='project')throw new InputError('project_id deve indicare un progetto esistente, attivo e con kind project. Usa null per scollegare l’attività.');
+}
 export class Store {
   constructor(readonly query: Query,readonly actor:Actor={kind:'owner',id:'owner',name:'Tu'}){}
   asActor(actor:Actor){return new Store(this.query,actor);}
@@ -37,6 +42,7 @@ export class Store {
         if(!change.document){if(index>=0)items.splice(index,1);}else if(index<0)items.push(change.document);else items[index]=change.document;
       }
     }
+    for(const change of changes.tasks)if(change.document)validateTaskProject(projected,(change.document as Workspace['tasks'][number]).project_id);
     if(!valid(projected))throw new InputError('Gerarchia o contenuto non validi.');
     try{
       const [row]=await this.query('SELECT cm_apply_changes_audited($1::jsonb,$2::integer,$3::jsonb) AS snapshot',[JSON.stringify(changes),legacyRevision??null,JSON.stringify(this.actor)]);
@@ -48,9 +54,15 @@ export class Store {
       throw error;
     }
   }
-  async memories(query='',limit=100): Promise<Memory[]> {
-    const rows=await this.query("SELECT * FROM cm_memories WHERE strpos(lower(key || ' ' || content || ' ' || tags::text),lower($1))>0 ORDER BY updated_at DESC,key LIMIT $2",[query,Math.min(100,Math.max(1,limit))]);
+  async memories(query='',limit=100,offset=0): Promise<Memory[]> {
+    if(!Number.isSafeInteger(offset)||offset<0)throw new InputError('Offset della memoria non valido.');
+    const rows=await this.query("SELECT * FROM cm_memories WHERE strpos(lower(key || ' ' || content || ' ' || tags::text),lower($1))>0 ORDER BY updated_at DESC,key LIMIT $2 OFFSET $3",[query,Math.min(100,Math.max(1,limit)),offset]);
     return rows.map(row=>({key:String(row.key),content:String(row.content),tags:row.tags as string[],revision:Number(row.revision),updatedAt:Number(row.updated_at)}));
+  }
+  async memoryPage(query='',limit=30,offset=0){
+    if(!Number.isSafeInteger(limit)||limit<1||limit>100||!Number.isSafeInteger(offset)||offset<0)throw new InputError('Limite o offset della memoria non validi.');
+    const [memories,rows]=await Promise.all([this.memories(query,limit,offset),this.query("SELECT count(*) AS total FROM cm_memories WHERE strpos(lower(key || ' ' || content || ' ' || tags::text),lower($1))>0",[query])]);
+    const total=Number(rows[0].total);return {memories,total,limit,offset,next_offset:offset+limit<total?offset+limit:null};
   }
   async remember(key: string, content: string, tags: string[], revision: number): Promise<Memory> {
     if(!/^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,119}$/.test(key)||!content.trim()||content.length>50_000||tags.length>15||tags.some(t=>typeof t!=='string'||t.length>80))throw new InputError('Chiave, contenuto o tag non validi.');

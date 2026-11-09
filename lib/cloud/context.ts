@@ -11,7 +11,7 @@ export async function getContext(db:Store,reader:string,memoryAccess:boolean,inp
  function clip(nodes:unknown[]){for(const node of nodes){const n=node as {title:string;icon:string;children:unknown[]};n.title=shorten(n.title,160);n.icon=shorten(n.icon,20);clip(n.children);}}
  clip(tree.pages);
  const open=snapshot.workspace.tasks.filter(task=>task.status!=='Completato');
- const data={server_version:'3.2.0',mode:compact?'compact':'full',retrieved_at:new Date().toISOString(),workspace_revision:snapshot.revision,
+ const data={server_version:'3.3.0',mode:compact?'compact':'full',retrieved_at:new Date().toISOString(),workspace_revision:snapshot.revision,
   page_tree:tree,memories:memoryRows.map(r=>({key:String(r.key),content:String(r.content),tags:(r.tags as string[]).slice(0,15),revision:Number(r.revision),updatedAt:Number(r.updated_at),content_truncated:Boolean(r.content_truncated)})),
   memory_access:memoryAccess,total_memories:Number(memoryRows[0]?.total||0),memories_limit:limits.memories,memories_truncated:false,
   open_tasks:open.slice(0,limits.tasks).map(t=>({...t,title:shorten(t.title,350),tag:shorten(t.tag,80)})),total_open_tasks:open.length,tasks_truncated:open.length>limits.tasks,

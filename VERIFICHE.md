@@ -1,5 +1,15 @@
 # Verifiche — 8 novembre 2026
 
+## Versione 3.3.0 — data del cestino e scritture protette · 9 novembre 2026
+
+- Trenta gruppi di test applicativi, inclusi sei nuovi: data server del cestinamento, conservazione durante modifiche, rimozione al ripristino ordinario/storico e nuova data al cestinamento successivo; migrazione idempotente e date locali.
+- Verificati fallback `updated` per dati storici, ordine crescente stabile, soglia stretta e paginazione di `older_than_days`; le letture non eseguono cancellazioni né avanzano la revisione del workspace.
+- `save_task` e store rifiutano collegamenti inesistenti, cestinati o di tipo errato con `invalid_input`; controllati anche parametro omesso durante aggiornamento e scollegamento esplicito.
+- Riduzione di `blocks` rifiutata senza `confirm_replace:true`, anche se compensata da `append_blocks`; nessun salvataggio parziale o evento di cronologia per tentativi rifiutati.
+- Client SDK MCP nuovo: discovery dei 32 strumenti e dei nuovi parametri, verifica versione 3.3.0, import/export todo Markdown, filtri/paginazione attività, filtro età del cestino, offset dei ricordi e ripristino senza `trashed_at`.
+- La prova nella nuova chat dell’account Claude resta distinta dal test SDK. Il README contiene il prompt post-deploy, che non autorizza svuotamenti o eliminazioni.
+- Venti test browser passati sulla build locale di produzione con API simulate, incluso cestinamento con data visualizzata e ripristino con rimozione di `trashed_at` dalla bozza. Build, TypeScript e controllo del bundle pubblico superati; nessun test accede ai documenti personali in Neon.
+
 ## Versione 3.2 — regressioni Markdown, ricerca e strumenti MCP · 9 novembre 2026
 
 - Ventiquattro gruppi di test applicativi: riproduzione del difetto nelle checkbox con liste loose, import/export ripetuto senza prefissi duplicati, conservazione di marcatori letterali, ricerca AND tra titolo e blocchi, OR/frase, ricerca unica e filtri dei permessi.

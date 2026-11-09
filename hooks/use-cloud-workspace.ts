@@ -2,6 +2,7 @@
 import {useCallback,useEffect,useRef,useState,type SetStateAction} from 'react';
 import {initial,valid,type Workspace} from '@/lib/workspace';
 import {hasEntityConflict,rebaseWorkspace,workspaceChanges} from '@/lib/workspace-changes';
+import {withTrashTimestamps} from '@/lib/trash-state';
 
 type Mode='loading'|'local'|'locked'|'cloud'|'unavailable';
 const LOCAL='spazio.workspace.v1',DRAFT='cosmomemo.cloud-draft.v1';
@@ -52,7 +53,7 @@ export function useCloudWorkspace(){
  },[]);
 
  const setData=useCallback((action:SetStateAction<Workspace>)=>{
-  const next=typeof action==='function'?action(latest.current):action;
+  const next=withTrashTimestamps(latest.current,typeof action==='function'?action(latest.current):action);
   latest.current=next;rawSet(next);setSyncMessage('');
   if(mode==='cloud'){dirty.current=true;setPending(true);}
  },[mode]);

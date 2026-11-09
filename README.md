@@ -58,7 +58,7 @@ Controlla i ricordi da **Memoria di Claude**. Puoi correggerli, eliminarli o esp
 | `create_page` | Crea una pagina con blocchi |
 | `create_page_from_markdown` | Trasforma il contenuto di un file MD in una pagina a blocchi |
 | `export_page_markdown` | Restituisce il Markdown della pagina e il nome del file |
-| `update_page` | Modifica o aggiunge blocchi con controllo della revisione |
+| `update_page` | Modifica o aggiunge blocchi; ridurre `blocks` richiede `confirm_replace:true` |
 | `set_page_properties` | Riclassifica tipo e stato delle pagine senza riscrivere i blocchi |
 | `get_project` | Legge il progetto e le sue attività, con conteggi e paginazione |
 | `read_section` | Legge una sezione e le sue sottosezioni |
@@ -69,9 +69,9 @@ Controlla i ricordi da **Memoria di Claude**. Puoi correggerli, eliminarli o esp
 | `move_page` | Sposta una pagina sotto un’altra o al livello principale |
 | `restore_page` | Ripristina una pagina dal cestino |
 | `delete_page` | Sposta una pagina nel cestino; conserva le sottopagine |
-| `list_trash` | Elenca soltanto le pagine nel cestino con ID e revisioni |
+| `list_trash` | Elenca il cestino dalla più vecchia, con `trashed_at` e filtro `older_than_days` |
 | `empty_trash` | Elimina definitivamente le pagine selezionate e le loro copie storiche |
-| `list_tasks` | Legge le attività |
+| `list_tasks` | Filtra per progetto, stato, priorità, area e testo; pagina con `limit`/`offset` |
 | `save_task` | Crea o aggiorna un’attività |
 | `delete_task` | Elimina una singola attività con controllo della revisione |
 | `list_page_history` | Elenca salvataggi, autore e campi modificati di una pagina |
@@ -79,15 +79,37 @@ Controlla i ricordi da **Memoria di Claude**. Puoi correggerli, eliminarli o esp
 | `restore_page_version` | Ripristina una versione storica creando un nuovo salvataggio |
 | `get_changes` | Restituisce le novità dall’ultimo punto di lettura del connettore |
 | `mark_changes_seen` | Registra il cursore effettivamente letto e riassunto |
-| `search_memories` | Recupera i ricordi pertinenti |
+| `search_memories` | Recupera ricordi completi con `limit`, `offset`, `total` e `next_offset` |
 | `remember` | Crea o aggiorna un ricordo |
 | `forget` | Elimina un ricordo |
 
 I permessi OAuth distinguono lettura e scrittura di pagine e memoria. Gli strumenti non autorizzati non vengono esposti. Dalle impostazioni di CosmoMemo puoi revocare un collegamento; i relativi token vengono invalidati anche se Claude li conserva.
 
+### Novità della versione 3.3.0
+
+Ricarica l’app e aggiorna o ricollega il connettore: `get_context.server_version` deve essere **`3.3.0`**. Restano disponibili **32 strumenti**, elencati sopra; cambiano alcuni parametri e controlli. Non servono nuove variabili d’ambiente. Prima del deploy esegui `npm run db:migrate` per installare la gestione atomica delle date, senza modificare né svuotare i contenuti esistenti.
+
+**Data del cestino.** Quando una pagina viene cestinata, `trashed_at` viene salvato in millisecondi Unix; nel cloud usa l’orologio di PostgreSQL, senza accettare una data arbitraria del client. Le successive modifiche a una pagina già nel cestino conservano la data originale. Il ripristino rimuove il campo, anche se avviene tramite una versione storica; un nuovo cestinamento registra una nuova data. Anche le modifiche nell’app locale mantengono questi comportamenti.
+
+`list_trash(limit,offset,older_than_days)` restituisce `trashed_at`, ordina **dalla più vecchia** e applica il filtro prima della paginazione. `older_than_days` accetta da 0 a 36.500 giorni, anche frazionari: include solo date strettamente precedenti a `adesso - giorni × 86.400.000`. Senza filtro elenca tutto il cestino. Per pagine precedenti alla 3.3 prive di `trashed_at`, restituisce `updated` come ripiego e `trashed_at_source:"updated"`; non inventa una data di cancellazione storica. Se quella pagina viene poi modificata nel cestino, la precedente data di ripiego viene conservata in `trashed_at`. Nell’app la data stimata è segnalata.
+
+Il filtro serve **esclusivamente a proporre a Dany quali pagine eliminare**. Non avvia alcuna cancellazione: niente scadenze automatiche, cron o pulizia periodica. `empty_trash` resta manuale, con selezione delle pagine, revisioni correnti e `confirm_permanent_deletion:true` soltanto dopo conferma esplicita di Dany. La lettura del cestino e il filtro non cambiano contenuti o revisioni.
+
+**Progetti delle attività.** `save_task` e `lib/cloud/store.ts` verificano che `project_id` indichi una pagina esistente, fuori dal cestino e con `kind:"project"`; in caso contrario lo strumento restituisce `invalid_input`. Il controllo SQL finale protegge anche dagli aggiornamenti concorrenti. `project_id:null` scollega. Se il parametro viene omesso durante un aggiornamento, conserva il collegamento ma lo verifica comunque: un’attività collegata a un progetto ormai nel cestino deve essere scollegata prima di essere modificata. Cestinare un progetto conserva le attività già collegate e non le elimina.
+
+**Sostituzione dei blocchi.** `update_page` con `blocks` sostituisce l’intera lista. Se la lista fornita ha meno blocchi della pagina corrente, richiede **`confirm_replace:true`**; anche `blocks:[]` richiede conferma se la pagina non è vuota. La presenza di `append_blocks` non aggira il controllo. Senza conferma restituisce `invalid_input`, indica `update_block`, `insert_block` e `append_to_section` e non salva neppure altri campi presenti nella chiamata. Con un numero uguale o maggiore di blocchi il parametro non è richiesto. La revisione deve sempre essere attuale e la cronologia conserva il contenuto sostituito.
+
+**Filtri e paginazione.** `list_tasks` combina `project_id`, `status` (`Da iniziare`, `In corso`, `Completato`), `priority` (`Alta`, `Media`, `Bassa`), `tag` (area esatta, ignorando maiuscole/accenti), `query` (tutte le parole in titolo, area e titolo del progetto), `limit` (predefinito 100, massimo 200) e `offset`. `search_memories` aggiunge `offset` a `query` e `limit` (predefinito 30, massimo 100). Entrambi restituiscono `total` e `next_offset`; `null` indica l’ultima pagina. L’ordine dei ricordi resta data di aggiornamento decrescente, poi chiave. Anche `GET /api/trash` e `GET /api/memories` accettano i rispettivi filtri e la paginazione.
+
+**Verifica con Claude dopo il deploy.** Aggiorna gli schemi del connettore e apri una nuova chat, poi chiedi:
+
+> Richiama la lista degli strumenti CosmoMemo e verifica con get_context che server_version sia 3.3.0. Importa una pagina di prova Markdown con due todo separati da una riga vuota, uno aperto e uno completato, ed esportala per controllare che i marcatori non siano duplicati. Chiama list_tasks con status "In corso", priority "Alta", limit 1 e offset 0; list_trash con older_than_days 30; search_memories con limit 1 e offset 1. Riporta gli esiti. Non svuotare il cestino e non eliminare pagine.
+
+La verifica automatica usa un nuovo client SDK MCP con discovery e gli stessi passaggi su un database di test; non equivale alla prova nell’account Claude del proprietario.
+
 ### Correzioni e strumenti della versione 3.2
 
-Aggiorna o ricollega il connettore per scaricare i nuovi schemi. `get_context.server_version` deve riportare `3.2.0`. Tipo/stato e collegamenti ai progetti erano già supportati dalla 3.1 tramite `update_page` e `list_tasks(project_id)`; ora hanno strumenti dedicati più facili da individuare.
+Aggiorna o ricollega il connettore per scaricare i nuovi schemi; `get_context.server_version` permette di verificare la versione in uso. Tipo/stato e collegamenti ai progetti erano già supportati dalla 3.1 tramite `update_page` e `list_tasks(project_id)`; dalla 3.2 hanno strumenti dedicati più facili da individuare.
 
 - **Checkbox Markdown:** corrette le liste con righe vuote e paragrafi multipli, in cui il parser manteneva il marcatore della checkbox anche nel testo. Ora import/export non aggiunge prefissi duplicati. Un secondo marcatore scritto intenzionalmente nel contenuto viene conservato. La correzione vale per nuove importazioni, senza riscrivere automaticamente le pagine già salvate.
 - **Ricerca per parole:** `search_pages(query:"vigilant curl")` usa `mode:"all"` e trova pagine che contengono entrambe le parole, anche nel titolo e in blocchi diversi. `mode:"any"` trova almeno una parola; `mode:"phrase"` richiede la frase esatta. Il confronto è per sottostringhe, senza distinzione di maiuscole e accenti, senza stemming o ricerca semantica. `list_pages.query` e `search_memories.query` mantengono il filtro per frase dichiarato nelle descrizioni.

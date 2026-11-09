@@ -1,9 +1,10 @@
 "use client";
 import {useState} from 'react';
 import type {Page} from '@/lib/workspace';
+import {trashTime} from '@/lib/trash-state';
 export function TrashActions({pages,connected,blocked,onRefresh}:{pages:Page[];connected:boolean;blocked:boolean;onRefresh:()=>Promise<unknown>}){
  const [selected,setSelected]=useState<{page_id:string;expected_page_revision:number}[]|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
- const trashed=pages.filter(p=>p.deleted);
+ const trashed=pages.filter(p=>p.deleted).sort((a,b)=>trashTime(a)-trashTime(b)||a.id.localeCompare(b.id));
  async function remove(){if(!selected||blocked)return;setBusy(true);setError('');try{
   const response=await fetch('/api/trash',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pages:selected,confirm_permanent_deletion:true}),signal:AbortSignal.timeout(15000)});const body=await response.json();if(!response.ok)throw Error(body.error||'Cancellazione non riuscita.');setSelected(null);await onRefresh();
  }catch(e){setError((e as Error).message);}finally{setBusy(false);}}

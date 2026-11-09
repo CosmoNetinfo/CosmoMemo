@@ -24,3 +24,12 @@ test('errore nello svuotamento: il cestino resta disponibile senza perdere le pa
  await page.getByRole('button',{name:'Sincronizza',exact:true}).click();await page.getByRole('button',{name:'Cestino',exact:true}).click();await page.route('**/api/trash',route=>route.fulfill({status:503,json:{error:'Connessione interrotta. Riprova.'}}));
  await page.getByRole('button',{name:'Svuota cestino'}).click();await page.getByRole('button',{name:'Conferma eliminazione definitiva'}).click();await expect(page.locator('.trash-actions').getByRole('alert')).toContainText('Connessione interrotta');await expect(page.locator('.trash-row')).toHaveCount(1);await expect(page.getByRole('button',{name:'Ripristina',exact:true})).toBeVisible();expect(cloud.workspace.pages.some(p=>p.id==='ideas')).toBe(true);
 });
+
+test('cestinare registra la data e ripristinare rimuove trashed_at anche dalla bozza del browser',async({page})=>{
+ const cloud=await mockCloud(page),start=Date.now();await page.getByRole('button',{name:/Benvenuto nel tuo Spazio/}).first().click();
+ await page.getByRole('button',{name:'Menu dello spazio'}).click();await page.getByRole('button',{name:'Sposta nel cestino',exact:true}).click();
+ await expect.poll(()=>cloud.workspace.pages.find(p=>p.id==='welcome')?.deleted).toBe(true);
+ const trashed=cloud.workspace.pages.find(p=>p.id==='welcome')!;expect(trashed.trashed_at).toBeGreaterThanOrEqual(start);
+ await page.getByRole('button',{name:'Cestino',exact:true}).click();const row=page.locator('.trash-row').filter({hasText:'Benvenuto nel tuo Spazio'});await expect(row).toContainText('Cestinata il');await expect(row).not.toContainText('data stimata');await row.getByRole('button',{name:'Ripristina',exact:true}).click();
+ await expect.poll(()=>cloud.workspace.pages.find(p=>p.id==='welcome')?.deleted).toBe(false);expect(Object.hasOwn(cloud.workspace.pages.find(p=>p.id==='welcome')!,'trashed_at')).toBe(false);
+});
