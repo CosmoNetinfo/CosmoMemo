@@ -1,5 +1,11 @@
 # Verifiche — 8 novembre 2026
 
+## Archivio completo delle pagine · 10 novembre 2026
+
+- Nuova vista **Tutte le pagine** dalla barra laterale e dalla home, con tutte le pagine attive e sottopagine, ricerca nel contenuto, filtri tipo/stato/preferiti, ordinamento e paginazione da 25/50/100 elementi.
+- Ventitré test browser passati sulla build di produzione locale. I tre nuovi casi verificano 137 pagine, accesso all’ultima schermata e a una sottopagina oltre la profondità visibile dell’albero, conservazione della posizione dopo aver aperto un documento, ricerca/filtri/reset/ordinamento e navigazione su telefono. Consultare e filtrare l’elenco non invia scritture al workspace.
+- Controllo visivo a 1440×1050 e 390×844: nessun errore JavaScript né overflow orizzontale. Build, TypeScript e controllo del bundle pubblico superati; i test usano dati simulati e non accedono alle pagine personali.
+
 ## Riepilogo read-only per Cosmo Control
 
 - Trentanove gruppi di test applicativi passati, con nove nuovi test per `GET /api/read-only/summary`: token valido/errato/mancante, variabile assente o vuota, lettura della variabile reale dalla route Next, indipendenza dai cookie, formato Bearer, rate limit con scadenza e gestione degli errori senza dettagli riservati.

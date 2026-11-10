@@ -7,6 +7,7 @@ Pagine, progetti e **memoria persistente per Claude**, con Next.js e PostgreSQL 
 ## Cosa comprende
 
 - Pagine e sottopagine, editor a blocchi, preferiti, ricerca, modelli e cestino.
+- Archivio **Tutte le pagine** con ricerca nel contenuto, filtri, ordinamento e accesso a tutte le sottopagine.
 - Attività in tabella e bacheca, filtri, priorità e scadenze.
 - Modalità locale nel browser e spazio cloud personale protetto da password.
 - Salvataggio in Neon e controllo delle revisioni per evitare sovrascritture tra app e Claude.
@@ -263,6 +264,12 @@ Il rate limit conserva solo contatori in memoria: dopo **10 fallimenti in una fi
 5. Per disattivare l’integrazione, rimuovi la variabile da CosmoMemo e ridistribuisci: il percorso torna a restituire 404. Per ruotare il token, sostituisci il valore su entrambi i servizi e ridistribuiscili.
 
 I controlli repository e bundle pubblico includono anche `COSMOMEMO_READ_TOKEN`. `.env.example` lo lascia vuoto; l’integrazione rimane disattivata finché non la configuri.
+
+## Vedere tutte le pagine
+
+Apri **Tutte le pagine** nella barra laterale, oppure **Vedi tutte le pagine** nella home. L’archivio mostra tutte le pagine attive e le sottopagine, anche quelle oltre la profondità visibile nell’albero laterale. Puoi cercare nel titolo e nel contenuto per parole separate, filtrare per tipo/stato/preferiti e ordinare per nome o data di modifica. Mostra il genitore di ogni sottopagina e il numero totale di risultati.
+
+L’elenco è suddiviso in schermate da 25, 50 o 100 elementi: usa **Precedente**, **Successiva** o il selettore **Pagina** per raggiungere qualsiasi risultato. Aprendo un documento e tornando all’archivio, filtri e posizione restano conservati durante la sessione nell’app. Le pagine nel cestino restano nella sezione dedicata. Funziona sia con lo spazio cloud sia con quello locale e non richiede configurazione aggiuntiva.
 
 ## Trasferire i dati locali
 
